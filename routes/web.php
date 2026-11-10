@@ -75,6 +75,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::patch('/users/{user}/toggle-active', [AdminDashboardController::class, 'toggleUserActive'])->name('users.toggle-active');
     Route::patch('/users/{user}/verify', [AdminDashboardController::class, 'verifyUserManual'])->name('users.verify');
     Route::patch('/users/{user}/reset-password', [AdminDashboardController::class, 'resetUserPassword'])->name('users.reset-password');
+    Route::post('/users/bulk-delete', [AdminDashboardController::class, 'bulkDeleteUsers'])->name('users.bulk-destroy');
     Route::delete('/users/{user}', [AdminDashboardController::class, 'deleteUser'])->name('users.destroy');
 
     // Keamanan sistem
@@ -103,9 +104,11 @@ Route::prefix('pustakawan')->name('pustakawan.')->middleware(['auth', 'pustakawa
 
     // Kategori buku
     Route::post('/kategori', [PustakawanDashboardController::class, 'storeKategori'])->name('kategori.store');
+    Route::post('/kategori/bulk-delete', [PustakawanDashboardController::class, 'bulkDestroyKategori'])->name('kategori.bulk-destroy');
     Route::put('/kategori/{kategori}', [PustakawanDashboardController::class, 'updateKategori'])->name('kategori.update');
     Route::delete('/kategori/{kategori}', [PustakawanDashboardController::class, 'destroyKategori'])->name('kategori.destroy');
 
     // Katalog buku
+    Route::delete('/buku-bulk-delete', [AdminBukuController::class, 'bulkDestroy'])->name('buku.bulk-destroy');
     Route::resource('buku', AdminBukuController::class);
 });

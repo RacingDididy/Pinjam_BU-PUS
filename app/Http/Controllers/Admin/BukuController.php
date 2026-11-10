@@ -237,15 +237,42 @@ class BukuController extends Controller
 
     public function destroy(Request $request, Buku $buku): RedirectResponse|JsonResponse
     {
+        $judul = $buku->judul;
         $buku->delete();
 
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Buku berhasil dihapus dari katalog!',
+                'message' => "Buku \"{$judul}\" berhasil dihapus dari katalog!",
             ]);
         }
 
-        return redirect()->route('pustakawan.buku.index')->with('success', 'Buku berhasil dihapus dari katalog!');
+        return redirect()->route('pustakawan.buku.index')->with('success', "Buku \"{$judul}\" berhasil dihapus dari katalog!");
+    }
+
+    public function bulkDestroy(Request $request): RedirectResponse|JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:bukus,id'],
+        ], [
+            'ids.required' => 'Pilih minimal 1 buku yang ingin dihapus.',
+            'ids.min' => 'Pilih minimal 1 buku yang ingin dihapus.',
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $validated['ids'])));
+        $deletedCount = Buku::whereIn('id', $ids)->delete();
+
+        $msg = "{$deletedCount} buku yang dipilih berhasil dihapus dari katalog!";
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'deleted_count' => $deletedCount,
+                'message' => $msg,
+            ]);
+        }
+
+        return redirect()->route('pustakawan.buku.index')->with('success', $msg);
     }
 }

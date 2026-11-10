@@ -284,6 +284,34 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function bulkDeleteUsers(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:users,id'],
+        ]);
+
+        $ids = array_values(array_filter(
+            array_unique(array_map('intval', $validated['ids'])),
+            fn (int $id) => $id !== (int) auth()->id()
+        ));
+
+        if (empty($ids)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak dapat menghapus akun Admin yang sedang Anda gunakan.',
+            ], 422);
+        }
+
+        $deletedCount = User::whereIn('id', $ids)->delete();
+
+        return response()->json([
+            'success' => true,
+            'deleted_ids' => $ids,
+            'message' => "{$deletedCount} akun terpilih berhasil dihapus dari sistem.",
+        ]);
+    }
+
     public function downloadSecurityBackup(): StreamedResponse
     {
         $filename = 'backup-keamanan-pinjam-bupus-'.now()->format('Y-m-d-His').'.json';

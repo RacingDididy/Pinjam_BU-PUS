@@ -19,6 +19,39 @@
         addKategoriName: '',
         addKategoriDesc: '',
         savingKategori: false,
+        selectedIds: [],
+        deleteModalOpen: false,
+        deleteMode: 'single',
+        deleteTargetKat: null,
+        deletingKategori: false,
+        isSelected(id) {
+            return this.selectedIds.includes(Number(id));
+        },
+        toggleSelect(id) {
+            const numId = Number(id);
+            if (this.isSelected(numId)) {
+                this.selectedIds = this.selectedIds.filter(i => i !== numId);
+            } else {
+                this.selectedIds.push(numId);
+            }
+        },
+        get deletableFilteredIds() {
+            return (this.filteredKategoris || [])
+                .filter(k => Number(k.bukus_count) === 0)
+                .map(k => Number(k.id));
+        },
+        get isAllDeletableSelected() {
+            const ids = this.deletableFilteredIds;
+            return ids.length > 0 && ids.every(id => this.selectedIds.includes(id));
+        },
+        toggleSelectAllDeletable() {
+            const ids = this.deletableFilteredIds;
+            if (this.isAllDeletableSelected) {
+                this.selectedIds = this.selectedIds.filter(id => !ids.includes(id));
+            } else {
+                this.selectedIds = Array.from(new Set([...this.selectedIds, ...ids]));
+            }
+        },
         get filteredKategoris() {
             if (!this.searchKat.trim()) return this.kategoris;
             const q = this.searchKat.toLowerCase();
@@ -59,25 +92,63 @@
                 this.savingKategori = false;
             }
         },
-        async deleteKategori(kat) {
-            if (!confirm(`Hapus kategori '${kat.nama_kategori}'?`)) return;
+        openSingleDelete(kat) {
+            this.deleteMode = 'single';
+            this.deleteTargetKat = kat;
+            this.deleteModalOpen = true;
+        },
+        openBulkDelete() {
+            if (this.selectedIds.length === 0) return;
+            this.deleteMode = 'bulk';
+            this.deleteModalOpen = true;
+        },
+        async confirmDeleteKategori() {
+            if (this.deletingKategori) return;
+            this.deletingKategori = true;
             try {
-                const res = await fetch(`/pustakawan/kategori/${kat.id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                if (this.deleteMode === 'single' && this.deleteTargetKat) {
+                    const kat = this.deleteTargetKat;
+                    const res = await fetch(`/pustakawan/kategori/${kat.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                        }
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        this.kategoris = this.kategoris.filter(k => k.id !== kat.id);
+                        this.selectedIds = this.selectedIds.filter(i => i !== Number(kat.id));
+                        this.deleteModalOpen = false;
+                        $dispatch('notify-toast', { message: data.message, type: 'success' });
+                    } else {
+                        $dispatch('notify-toast', { message: data.message || 'Tidak dapat menghapus kategori.', type: 'error' });
                     }
-                });
-                const data = await res.json();
-                if (res.ok && data.success) {
-                    this.kategoris = this.kategoris.filter(k => k.id !== kat.id);
-                    $dispatch('notify-toast', { message: data.message, type: 'success' });
-                } else {
-                    $dispatch('notify-toast', { message: data.message || 'Tidak dapat menghapus kategori.', type: 'error' });
+                } else if (this.deleteMode === 'bulk') {
+                    const res = await fetch('{{ route('pustakawan.kategori.bulk-destroy') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                        },
+                        body: JSON.stringify({ ids: this.selectedIds })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        const deleted = (data.deleted_ids || []).map(Number);
+                        this.kategoris = this.kategoris.filter(k => !deleted.includes(Number(k.id)));
+                        this.selectedIds = [];
+                        this.deleteModalOpen = false;
+                        $dispatch('notify-toast', { message: data.message, type: 'success' });
+                    } else {
+                        $dispatch('notify-toast', { message: data.message || 'Gagal menghapus kategori.', type: 'error' });
+                    }
                 }
             } catch (e) {
                 $dispatch('notify-toast', { message: 'Gangguan jaringan.', type: 'error' });
+            } finally {
+                this.deletingKategori = false;
             }
         }
     }"
@@ -153,20 +224,57 @@
                     </h2>
                     <p class="text-xs text-slate-500">Hanya kategori yang belum memiliki buku (0 judul) yang dapat dihapus.</p>
                 </div>
-                <div class="relative">
-                    <i class="ph ph-magnifying-glass text-slate-400 text-sm absolute left-3 top-1/2 -translate-y-1/2"></i>
-                    <input 
-                        type="text"
-                        x-model="searchKat"
-                        placeholder="Cari kategori..."
-                        class="w-full sm:w-52 pl-8 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold outline-none focus:border-emerald-500"
-                    >
+                <div class="flex flex-wrap items-center gap-2">
+                    <template x-if="deletableFilteredIds.length > 0">
+                        <label class="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                            <input 
+                                type="checkbox" 
+                                :checked="isAllDeletableSelected"
+                                @change="toggleSelectAllDeletable()"
+                                class="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                            >
+                            <span>Pilih Kosong</span>
+                        </label>
+                    </template>
+
+                    <template x-if="selectedIds.length > 0">
+                        <button 
+                            type="button"
+                            @click="openBulkDelete()"
+                            class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-xs transition-all"
+                        >
+                            <i class="ph-bold ph-trash"></i>
+                            <span>Hapus (<span x-text="selectedIds.length"></span>)</span>
+                        </button>
+                    </template>
+
+                    <div class="relative">
+                        <i class="ph ph-magnifying-glass text-slate-400 text-sm absolute left-3 top-1/2 -translate-y-1/2"></i>
+                        <input 
+                            type="text"
+                            x-model="searchKat"
+                            placeholder="Cari kategori..."
+                            class="w-full sm:w-48 pl-8 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold outline-none focus:border-emerald-500"
+                        >
+                    </div>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <template x-for="kat in filteredKategoris" :key="kat.id">
-                    <div class="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/60 flex items-start justify-between gap-3">
+                    <div 
+                        class="p-4 rounded-2xl border transition-colors flex items-start justify-between gap-3"
+                        :class="isSelected(kat.id) ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200/80 bg-slate-50/60'"
+                    >
+                        <div class="pt-0.5 shrink-0" x-show="Number(kat.bukus_count) === 0">
+                            <input 
+                                type="checkbox" 
+                                :checked="isSelected(kat.id)"
+                                @change="toggleSelect(kat.id)"
+                                class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                            >
+                        </div>
+
                         <div class="min-w-0 space-y-1.5 flex-1">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="font-extrabold text-xs sm:text-sm text-slate-900 truncate" x-text="kat.nama_kategori"></span>
@@ -183,7 +291,7 @@
 
                         <button 
                             type="button"
-                            @click="deleteKategori(kat)"
+                            @click="openSingleDelete(kat)"
                             x-show="Number(kat.bukus_count) === 0"
                             title="Hapus kategori kosong"
                             class="w-8 h-8 rounded-xl border border-slate-200 bg-white hover:border-rose-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center shrink-0 transition-colors"
@@ -195,6 +303,55 @@
             </div>
         </section>
 
+    </div>
+
+    <!-- Modal Pop-up Konfirmasi Hapus Kategori -->
+    <div 
+        x-show="deleteModalOpen" 
+        x-cloak 
+        class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 !mt-0"
+    >
+        <div 
+            @click.away="deleteModalOpen = false"
+            class="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden p-5 sm:p-6 text-center space-y-4"
+        >
+            <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto text-2xl">
+                <i class="ph-bold ph-trash"></i>
+            </div>
+
+            <div class="space-y-1.5">
+                <h3 class="text-base sm:text-lg font-extrabold text-slate-900" x-text="deleteMode === 'bulk' ? 'Hapus ' + selectedIds.length + ' Kategori Sekaligus?' : 'Hapus Kategori Buku?'"></h3>
+                <template x-if="deleteMode === 'single' && deleteTargetKat">
+                    <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                        Apakah Anda yakin ingin menghapus kategori <strong class="text-slate-800" x-text="'&quot;' + deleteTargetKat.nama_kategori + '&quot;'"></strong>?
+                    </p>
+                </template>
+                <template x-if="deleteMode === 'bulk'">
+                    <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                        Apakah Anda yakin ingin menghapus <strong class="text-rose-600" x-text="selectedIds.length + ' kategori kosong yang dipilih'"></strong>?
+                    </p>
+                </template>
+            </div>
+
+            <div class="pt-2 flex items-center gap-2.5">
+                <button 
+                    type="button" 
+                    @click="deleteModalOpen = false"
+                    class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm transition-colors"
+                >
+                    Batal
+                </button>
+                <button 
+                    type="button"
+                    @click="confirmDeleteKategori()"
+                    :disabled="deletingKategori"
+                    class="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-rose-500/20 transition-all inline-flex items-center justify-center gap-1.5"
+                >
+                    <i class="ph-bold ph-trash text-sm"></i>
+                    <span x-text="deletingKategori ? 'Menghapus...' : 'Ya, Hapus'"></span>
+                </button>
+            </div>
+        </div>
     </div>
 
 </div>

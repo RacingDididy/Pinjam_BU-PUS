@@ -16,6 +16,102 @@
         addUserModalOpen: false,
         busyUserId: null,
         creatingUser: false,
+        currentAdminId: {{ (int) auth()->id() }},
+        selectedIds: [],
+        deleteModalOpen: false,
+        deleteMode: 'single',
+        deleteTargetUser: null,
+        deletingUsers: false,
+        isSelected(id) {
+            return this.selectedIds.includes(Number(id));
+        },
+        toggleSelect(id) {
+            const numId = Number(id);
+            if (numId === this.currentAdminId) return;
+            if (this.isSelected(numId)) {
+                this.selectedIds = this.selectedIds.filter(i => i !== numId);
+            } else {
+                this.selectedIds.push(numId);
+            }
+        },
+        get deletableFilteredIds() {
+            return (this.filteredUsers || [])
+                .filter(u => Number(u.id) !== this.currentAdminId)
+                .map(u => Number(u.id));
+        },
+        get isAllFilteredSelected() {
+            const ids = this.deletableFilteredIds;
+            return ids.length > 0 && ids.every(id => this.selectedIds.includes(id));
+        },
+        toggleSelectAllFiltered() {
+            const ids = this.deletableFilteredIds;
+            if (this.isAllFilteredSelected) {
+                this.selectedIds = this.selectedIds.filter(id => !ids.includes(id));
+            } else {
+                this.selectedIds = Array.from(new Set([...this.selectedIds, ...ids]));
+            }
+        },
+        openSingleDelete(user) {
+            this.deleteMode = 'single';
+            this.deleteTargetUser = user;
+            this.deleteModalOpen = true;
+        },
+        openBulkDelete() {
+            if (this.selectedIds.length === 0) return;
+            this.deleteMode = 'bulk';
+            this.deleteModalOpen = true;
+        },
+        async confirmDeleteUsers() {
+            if (this.deletingUsers) return;
+            this.deletingUsers = true;
+            try {
+                if (this.deleteMode === 'single' && this.deleteTargetUser) {
+                    const user = this.deleteTargetUser;
+                    this.busyUserId = user.id;
+                    const res = await fetch(`/admin/users/${user.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                        }
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        this.users = this.users.filter(u => u.id !== user.id);
+                        this.selectedIds = this.selectedIds.filter(i => i !== Number(user.id));
+                        this.deleteModalOpen = false;
+                        $dispatch('notify-toast', { message: data.message, type: 'success' });
+                    } else {
+                        $dispatch('notify-toast', { message: data.message || 'Gagal menghapus akun.', type: 'error' });
+                    }
+                } else if (this.deleteMode === 'bulk') {
+                    const res = await fetch('{{ route('admin.users.bulk-destroy') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                        },
+                        body: JSON.stringify({ ids: this.selectedIds })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        const deleted = (data.deleted_ids || []).map(Number);
+                        this.users = this.users.filter(u => !deleted.includes(Number(u.id)));
+                        this.selectedIds = [];
+                        this.deleteModalOpen = false;
+                        $dispatch('notify-toast', { message: data.message, type: 'success' });
+                    } else {
+                        $dispatch('notify-toast', { message: data.message || 'Gagal menghapus akun terpilih.', type: 'error' });
+                    }
+                }
+            } catch (e) {
+                $dispatch('notify-toast', { message: 'Gangguan jaringan.', type: 'error' });
+            } finally {
+                this.busyUserId = null;
+                this.deletingUsers = false;
+            }
+        },
         newUser: {
             name: '',
             email: '',
@@ -240,6 +336,26 @@
                 <span class="px-2.5 py-1 rounded-xl bg-indigo-50 text-indigo-700">
                     Admin: <strong x-text="users.filter(u => u.role === 'admin').length"></strong>
                 </span>
+
+                <template x-if="selectedIds.length > 0">
+                    <div class="inline-flex items-center gap-1.5 ml-1">
+                        <button 
+                            type="button"
+                            @click="selectedIds = []"
+                            class="px-2.5 py-1 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-bold text-xs"
+                        >
+                            Batal (<span x-text="selectedIds.length"></span>)
+                        </button>
+                        <button 
+                            type="button"
+                            @click="openBulkDelete()"
+                            class="px-3 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs inline-flex items-center gap-1 shadow-xs transition-all"
+                        >
+                            <i class="ph-bold ph-trash"></i>
+                            <span>Hapus Terpilih (<span x-text="selectedIds.length"></span>)</span>
+                        </button>
+                    </div>
+                </template>
             </div>
 
             <!-- Search & Filters -->
@@ -341,7 +457,7 @@
                             <button type="button" @click="selectedUser = u" class="px-2.5 py-1 rounded-lg bg-slate-200/70 text-slate-700 font-bold text-[10px]">Detail</button>
                             <button type="button" @click="resetPassModalUser = u; newPassword = ''" class="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 font-bold text-[10px]">Sandi</button>
                             <button type="button" @click="toggleActive(u)" class="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 font-bold text-[10px]" x-text="u.is_active ? 'Bekukan' : 'Aktifkan'"></button>
-                            <button type="button" @click="removeUser(u)" class="w-7 h-7 rounded-lg border border-rose-200 text-rose-600 flex items-center justify-center"><i class="ph-bold ph-trash text-xs"></i></button>
+                            <button type="button" x-show="Number(u.id) !== currentAdminId" @click="openSingleDelete(u)" class="w-7 h-7 rounded-lg border border-rose-200 text-rose-600 flex items-center justify-center"><i class="ph-bold ph-trash text-xs"></i></button>
                         </div>
                     </div>
                 </div>
@@ -353,6 +469,15 @@
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                        <th class="py-3 pl-3 pr-1 w-9">
+                            <input 
+                                type="checkbox" 
+                                :checked="isAllFilteredSelected"
+                                @change="toggleSelectAllFiltered()"
+                                class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                title="Pilih Semua"
+                            >
+                        </th>
                         <th class="py-3 px-3">Akun Pengguna</th>
                         <th class="py-3 px-3">Identitas Sekolah (NISN &amp; Kelas)</th>
                         <th class="py-3 px-3">Keamanan Email &amp; Identitas</th>
@@ -362,7 +487,19 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100 text-xs">
                     <template x-for="u in filteredUsers" :key="u.id">
-                        <tr class="hover:bg-slate-50/80 transition-colors">
+                        <tr 
+                            class="hover:bg-slate-50/80 transition-colors"
+                            :class="isSelected(u.id) ? 'bg-blue-50/50' : ''"
+                        >
+                            <td class="py-3.5 pl-3 pr-1">
+                                <input 
+                                    type="checkbox" 
+                                    x-show="Number(u.id) !== currentAdminId"
+                                    :checked="isSelected(u.id)"
+                                    @change="toggleSelect(u.id)"
+                                    class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                >
+                            </td>
                             <td class="py-3.5 px-3">
                                 <div class="flex items-center gap-2.5">
                                     <span 
@@ -478,7 +615,8 @@
 
                                     <button 
                                         type="button"
-                                        @click="removeUser(u)"
+                                        x-show="Number(u.id) !== currentAdminId"
+                                        @click="openSingleDelete(u)"
                                         :disabled="busyUserId === u.id"
                                         title="Hapus akun"
                                         class="w-8 h-8 rounded-xl border border-slate-200 hover:border-rose-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors"
@@ -497,6 +635,54 @@
             Tidak ada akun pengguna yang sesuai dengan pencarian atau filter.
         </div>
     </section>
+
+    <!-- Modal Pop-up Konfirmasi Hapus Akun (Satuan & Pilih Banyak) -->
+    <div 
+        x-cloak
+        x-show="deleteModalOpen"
+        x-transition
+        class="fixed inset-0 !mt-0 z-50 flex items-center justify-center p-4"
+    >
+        <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="deleteModalOpen = false"></div>
+        <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-5 sm:p-6 z-10 text-center space-y-4">
+            <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto text-2xl">
+                <i class="ph-bold ph-trash"></i>
+            </div>
+
+            <div class="space-y-1.5">
+                <h3 class="text-base sm:text-lg font-extrabold text-slate-900" x-text="deleteMode === 'bulk' ? 'Hapus ' + selectedIds.length + ' Akun Sekaligus?' : 'Hapus Akun Pengguna?'"></h3>
+                <template x-if="deleteMode === 'single' && deleteTargetUser">
+                    <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                        Apakah Anda yakin ingin menghapus akun <strong class="text-slate-800" x-text="deleteTargetUser.name + ' (' + deleteTargetUser.email + ')'"></strong> secara permanen?
+                    </p>
+                </template>
+                <template x-if="deleteMode === 'bulk'">
+                    <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                        Apakah Anda yakin ingin menghapus <strong class="text-rose-600" x-text="selectedIds.length + ' akun pengguna yang dipilih'"></strong> secara permanen dari sistem?
+                    </p>
+                </template>
+            </div>
+
+            <div class="pt-2 flex items-center gap-2.5">
+                <button 
+                    type="button" 
+                    @click="deleteModalOpen = false"
+                    class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm transition-colors"
+                >
+                    Batal
+                </button>
+                <button 
+                    type="button"
+                    @click="confirmDeleteUsers()"
+                    :disabled="deletingUsers"
+                    class="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-rose-500/20 transition-all inline-flex items-center justify-center gap-1.5"
+                >
+                    <i class="ph-bold ph-trash text-sm"></i>
+                    <span x-text="deletingUsers ? 'Menghapus...' : 'Ya, Hapus'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal detail identitas -->
     <div 

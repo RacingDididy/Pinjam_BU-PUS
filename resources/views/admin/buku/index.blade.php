@@ -4,12 +4,55 @@
 @section('page-title', 'Kelola Katalog Buku')
 
 @section('content')
-<div class="w-full" x-data="{ openCreateModal: false }">
+<div 
+    class="w-full" 
+    x-data="{ 
+        openCreateModal: false,
+        pageIds: {{ Js::from($bukus->pluck('id')->map(fn($id) => (int) $id)->values()) }},
+        selectedIds: [],
+        deleteModalOpen: false,
+        deleteMode: 'single',
+        deleteTargetUrl: '',
+        deleteTargetTitle: '',
+        isSelected(id) {
+            return this.selectedIds.includes(Number(id));
+        },
+        toggleSelect(id) {
+            const numId = Number(id);
+            if (this.isSelected(numId)) {
+                this.selectedIds = this.selectedIds.filter(i => i !== numId);
+            } else {
+                this.selectedIds.push(numId);
+            }
+        },
+        get isAllSelected() {
+            return this.pageIds.length > 0 && this.pageIds.every(id => this.selectedIds.includes(Number(id)));
+        },
+        toggleSelectAll() {
+            if (this.isAllSelected) {
+                this.selectedIds = [];
+            } else {
+                this.selectedIds = [...this.pageIds];
+            }
+        },
+        openSingleDelete(url, title) {
+            this.deleteMode = 'single';
+            this.deleteTargetUrl = url;
+            this.deleteTargetTitle = title;
+            this.deleteModalOpen = true;
+        },
+        openBulkDelete() {
+            if (this.selectedIds.length === 0) return;
+            this.deleteMode = 'bulk';
+            this.deleteModalOpen = true;
+        }
+    }"
+>
 
     <!-- Kontainer tabel buku -->
     <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         
-        <!-- Pencarian dan tombol tambah -->
+        <!-- Pencarian dan tombol aksi -->
         <div class="p-3.5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
             <!-- Search Input -->
@@ -26,21 +69,74 @@
                 </button>
             </form>
 
-            <!-- Tombol Tambah Buku Baru -->
-            <button 
-                @click="openCreateModal = true" 
-                class="w-full sm:w-auto bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm shadow-blue-500/20 transition-all active:scale-95"
-            >
-                <i class="ph-bold ph-plus-circle text-base sm:text-lg"></i>
-                <span>Tambah Buku Baru</span>
-            </button>
+            <!-- Tombol Aksi Kanan (Hapus Banyak & Tambah Buku) -->
+            <div class="flex flex-wrap items-center gap-2">
+                <template x-if="selectedIds.length > 0">
+                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                        <button 
+                            type="button"
+                            @click="selectedIds = []"
+                            class="px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-xs transition-all"
+                        >
+                            Batal (<span x-text="selectedIds.length"></span>)
+                        </button>
+                        <button 
+                            type="button"
+                            @click="openBulkDelete()"
+                            class="flex-1 sm:flex-initial bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm shadow-rose-500/20 transition-all active:scale-95"
+                        >
+                            <i class="ph-bold ph-trash text-base"></i>
+                            <span>Hapus Terpilih (<span x-text="selectedIds.length"></span>)</span>
+                        </button>
+                    </div>
+                </template>
+
+                <button 
+                    type="button"
+                    @click="openCreateModal = true" 
+                    class="w-full sm:w-auto bg-[#2563EB] hover:bg-blue-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm shadow-blue-500/20 transition-all active:scale-95"
+                >
+                    <i class="ph-bold ph-plus-circle text-base sm:text-lg"></i>
+                    <span>Tambah Buku Baru</span>
+                </button>
+            </div>
 
         </div>
+
+        <!-- Bar Pilih Semua untuk Mobile -->
+        @if($bukus->count() > 0)
+            <div class="md:hidden px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between">
+                <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                    <input 
+                        type="checkbox" 
+                        :checked="isAllSelected" 
+                        @change="toggleSelectAll()"
+                        class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    >
+                    <span class="text-xs font-bold text-slate-700">Pilih Semua di Halaman Ini</span>
+                </label>
+                <span x-show="selectedIds.length > 0" class="text-[11px] font-extrabold text-blue-600">
+                    <span x-text="selectedIds.length"></span> dipilih
+                </span>
+            </div>
+        @endif
 
         <!-- Daftar Kartu Buku Ringkas untuk Mobile -->
         <div class="md:hidden divide-y divide-slate-100">
             @forelse($bukus as $buku)
-                <div class="p-3.5 flex items-start gap-3">
+                <div 
+                    class="p-3.5 flex items-start gap-3 transition-colors"
+                    :class="isSelected({{ $buku->id }}) ? 'bg-blue-50/50' : ''"
+                >
+                    <div class="pt-1 shrink-0">
+                        <input 
+                            type="checkbox" 
+                            :checked="isSelected({{ $buku->id }})"
+                            @change="toggleSelect({{ $buku->id }})"
+                            class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        >
+                    </div>
+
                     <div class="w-14 h-20 rounded-xl overflow-hidden bg-slate-100 shrink-0 border border-slate-200/70">
                         <img src="{{ $buku->cover_url }}" alt="{{ $buku->judul }}" class="w-full h-full object-cover">
                     </div>
@@ -73,17 +169,14 @@
                                     <span>Edit</span>
                                 </a>
 
-                                <form action="{{ route('pustakawan.buku.destroy', $buku) }}" method="POST" onsubmit="return confirm('Hapus buku {{ addslashes($buku->judul) }}?')">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button 
-                                        type="submit" 
-                                        class="w-7 h-7 rounded-lg border border-rose-200 text-rose-600 flex items-center justify-center"
-                                        title="Hapus Buku"
-                                    >
-                                        <i class="ph-bold ph-trash text-xs"></i>
-                                    </button>
-                                </form>
+                                <button 
+                                    type="button" 
+                                    @click="openSingleDelete('{{ route('pustakawan.buku.destroy', $buku) }}', {{ Js::from($buku->judul) }})"
+                                    class="w-7 h-7 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"
+                                    title="Hapus Buku"
+                                >
+                                    <i class="ph-bold ph-trash text-xs"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -100,6 +193,15 @@
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="border-b border-slate-100 text-slate-400 text-xs font-bold uppercase tracking-wider bg-slate-50/50">
+                        <th class="py-4 pl-6 pr-2 w-10">
+                            <input 
+                                type="checkbox" 
+                                :checked="isAllSelected"
+                                @change="toggleSelectAll()"
+                                class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                title="Pilih Semua di Halaman Ini"
+                            >
+                        </th>
                         <th class="py-4 px-6">Buku</th>
                         <th class="py-4 px-6">Kategori</th>
                         <th class="py-4 px-6">Stok</th>
@@ -109,7 +211,19 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100 text-sm">
                     @forelse($bukus as $buku)
-                        <tr class="hover:bg-slate-50/60 transition-colors group">
+                        <tr 
+                            class="hover:bg-slate-50/60 transition-colors group"
+                            :class="isSelected({{ $buku->id }}) ? 'bg-blue-50/50' : ''"
+                        >
+                            <!-- Kolom Checkbox Pilih -->
+                            <td class="py-4 pl-6 pr-2">
+                                <input 
+                                    type="checkbox" 
+                                    :checked="isSelected({{ $buku->id }})"
+                                    @change="toggleSelect({{ $buku->id }})"
+                                    class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                >
+                            </td>
                             
                             <!-- Kolom Buku: Thumbnail + Judul + Penulis • Tahun -->
                             <td class="py-4 px-6">
@@ -163,24 +277,21 @@
                                         <i class="ph-bold ph-pencil-simple text-base"></i>
                                     </a>
 
-                                    <form action="{{ route('pustakawan.buku.destroy', $buku) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus buku {{ addslashes($buku->judul) }}?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button 
-                                            type="submit" 
-                                            class="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                                            title="Hapus Buku"
-                                        >
-                                            <i class="ph-bold ph-trash text-base"></i>
-                                        </button>
-                                    </form>
+                                    <button 
+                                        type="button" 
+                                        @click="openSingleDelete('{{ route('pustakawan.buku.destroy', $buku) }}', {{ Js::from($buku->judul) }})"
+                                        class="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                        title="Hapus Buku"
+                                    >
+                                        <i class="ph-bold ph-trash text-base"></i>
+                                    </button>
                                 </div>
                             </td>
 
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="py-12 text-center text-slate-500">
+                            <td colspan="6" class="py-12 text-center text-slate-500">
                                 <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3 text-xl">
                                     <i class="ph ph-books"></i>
                                 </div>
@@ -526,6 +637,91 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal Pop-up Konfirmasi Hapus Buku (Satuan & Pilih Banyak) -->
+    <div 
+        x-show="deleteModalOpen" 
+        x-cloak 
+        class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 !mt-0"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+    >
+        <div 
+            @click.away="deleteModalOpen = false"
+            class="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden p-5 sm:p-6 text-center space-y-4"
+        >
+            <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto text-2xl shadow-xs">
+                <i class="ph-bold ph-trash"></i>
+            </div>
+
+            <div class="space-y-1.5">
+                <h3 class="text-base sm:text-lg font-extrabold text-slate-900" x-text="deleteMode === 'bulk' ? 'Hapus ' + selectedIds.length + ' Buku Sekaligus?' : 'Hapus Buku dari Katalog?'"></h3>
+                
+                <template x-if="deleteMode === 'single'">
+                    <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                        Apakah Anda yakin ingin menghapus buku <strong class="text-slate-800" x-text="'&quot;' + deleteTargetTitle + '&quot;'"></strong>? Data buku yang dihapus tidak dapat dikembalikan.
+                    </p>
+                </template>
+
+                <template x-if="deleteMode === 'bulk'">
+                    <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                        Apakah Anda yakin ingin menghapus <strong class="text-rose-600" x-text="selectedIds.length + ' buku yang dipilih'"></strong> secara permanen dari katalog perpustakaan?
+                    </p>
+                </template>
+            </div>
+
+            <!-- Form Hapus Satuan -->
+            <template x-if="deleteMode === 'single'">
+                <form :action="deleteTargetUrl" method="POST" class="pt-2 flex items-center gap-2.5">
+                    @csrf
+                    @method('DELETE')
+                    <button 
+                        type="button" 
+                        @click="deleteModalOpen = false"
+                        class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm transition-colors"
+                    >
+                        Batal
+                    </button>
+                    <button 
+                        type="submit"
+                        class="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-rose-500/20 transition-all inline-flex items-center justify-center gap-1.5"
+                    >
+                        <i class="ph-bold ph-trash text-sm"></i>
+                        <span>Ya, Hapus</span>
+                    </button>
+                </form>
+            </template>
+
+            <!-- Form Hapus Banyak (Bulk) -->
+            <template x-if="deleteMode === 'bulk'">
+                <form action="{{ route('pustakawan.buku.bulk-destroy') }}" method="POST" class="pt-2 flex items-center gap-2.5">
+                    @csrf
+                    @method('DELETE')
+                    <template x-for="id in selectedIds" :key="'del-' + id">
+                        <input type="hidden" name="ids[]" :value="id">
+                    </template>
+                    <button 
+                        type="button" 
+                        @click="deleteModalOpen = false"
+                        class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm transition-colors"
+                    >
+                        Batal
+                    </button>
+                    <button 
+                        type="submit"
+                        class="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-rose-500/20 transition-all inline-flex items-center justify-center gap-1.5"
+                    >
+                        <i class="ph-bold ph-trash text-sm"></i>
+                        <span>Hapus (<span x-text="selectedIds.length"></span> Buku)</span>
+                    </button>
+                </form>
+            </template>
         </div>
     </div>
 

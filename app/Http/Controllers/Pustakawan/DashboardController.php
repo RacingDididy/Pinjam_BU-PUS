@@ -276,6 +276,47 @@ class DashboardController extends Controller
         ]);
     }
 
+    public function bulkDestroyKategori(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:kategoris,id'],
+        ]);
+
+        $ids = array_values(array_unique(array_map('intval', $validated['ids'])));
+        $kategoris = Kategori::withCount('bukus')->whereIn('id', $ids)->get();
+
+        $deletedIds = [];
+        $skippedNames = [];
+
+        foreach ($kategoris as $kat) {
+            if ($kat->bukus_count > 0) {
+                $skippedNames[] = $kat->nama_kategori;
+            } else {
+                $deletedIds[] = $kat->id;
+                $kat->delete();
+            }
+        }
+
+        if (empty($deletedIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kategori yang dipilih masih memiliki koleksi buku dan tidak dapat dihapus.',
+            ], 422);
+        }
+
+        $msg = count($deletedIds).' kategori berhasil dihapus.';
+        if (! empty($skippedNames)) {
+            $msg .= ' ('.count($skippedNames).' kategori dilewati karena masih memiliki buku).';
+        }
+
+        return response()->json([
+            'success' => true,
+            'deleted_ids' => $deletedIds,
+            'message' => $msg,
+        ]);
+    }
+
     private function loadBooksWithStats()
     {
         return Buku::with('kategori')

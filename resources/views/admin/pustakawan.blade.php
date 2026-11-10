@@ -14,6 +14,85 @@
         newPassword: '',
         busyStaffId: null,
         creatingStaff: false,
+        currentAdminId: {{ (int) auth()->id() }},
+        selectedIds: [],
+        deleteModalOpen: false,
+        deleteMode: 'single',
+        deleteTargetStaff: null,
+        deletingStaff: false,
+        isSelected(id) {
+            return this.selectedIds.includes(Number(id));
+        },
+        toggleSelect(id) {
+            const numId = Number(id);
+            if (numId === this.currentAdminId) return;
+            if (this.isSelected(numId)) {
+                this.selectedIds = this.selectedIds.filter(i => i !== numId);
+            } else {
+                this.selectedIds.push(numId);
+            }
+        },
+        openSingleDelete(staff) {
+            this.deleteMode = 'single';
+            this.deleteTargetStaff = staff;
+            this.deleteModalOpen = true;
+        },
+        openBulkDelete() {
+            if (this.selectedIds.length === 0) return;
+            this.deleteMode = 'bulk';
+            this.deleteModalOpen = true;
+        },
+        async confirmDeleteStaff() {
+            if (this.deletingStaff) return;
+            this.deletingStaff = true;
+            try {
+                if (this.deleteMode === 'single' && this.deleteTargetStaff) {
+                    const staff = this.deleteTargetStaff;
+                    this.busyStaffId = staff.id;
+                    const res = await fetch(`/admin/users/${staff.id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                        }
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        this.staffList = this.staffList.filter(s => s.id !== staff.id);
+                        this.selectedIds = this.selectedIds.filter(i => i !== Number(staff.id));
+                        this.deleteModalOpen = false;
+                        $dispatch('notify-toast', { message: data.message, type: 'success' });
+                    } else {
+                        $dispatch('notify-toast', { message: data.message || 'Gagal menghapus akun petugas.', type: 'error' });
+                    }
+                } else if (this.deleteMode === 'bulk') {
+                    const res = await fetch('{{ route('admin.users.bulk-destroy') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                        },
+                        body: JSON.stringify({ ids: this.selectedIds })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        const deleted = (data.deleted_ids || []).map(Number);
+                        this.staffList = this.staffList.filter(s => !deleted.includes(Number(s.id)));
+                        this.selectedIds = [];
+                        this.deleteModalOpen = false;
+                        $dispatch('notify-toast', { message: data.message, type: 'success' });
+                    } else {
+                        $dispatch('notify-toast', { message: data.message || 'Gagal menghapus akun terpilih.', type: 'error' });
+                    }
+                }
+            } catch (e) {
+                $dispatch('notify-toast', { message: 'Gangguan jaringan.', type: 'error' });
+            } finally {
+                this.busyStaffId = null;
+                this.deletingStaff = false;
+            }
+        },
         newStaff: {
             name: '',
             email: '',
@@ -255,17 +334,49 @@
                 </button>
             </div>
 
-            <span class="text-[11px] font-semibold text-slate-400">
-                Klik <strong>Reset Sandi</strong> jika pustakawan lupa kata sandi.
-            </span>
+            <div class="flex items-center gap-2">
+                <template x-if="selectedIds.length > 0">
+                    <div class="inline-flex items-center gap-1.5">
+                        <button 
+                            type="button"
+                            @click="selectedIds = []"
+                            class="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 font-bold text-xs"
+                        >
+                            Batal (<span x-text="selectedIds.length"></span>)
+                        </button>
+                        <button 
+                            type="button"
+                            @click="openBulkDelete()"
+                            class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs inline-flex items-center gap-1 shadow-xs transition-all"
+                        >
+                            <i class="ph-bold ph-trash"></i>
+                            <span>Hapus Terpilih (<span x-text="selectedIds.length"></span>)</span>
+                        </button>
+                    </div>
+                </template>
+
+                <span x-show="selectedIds.length === 0" class="text-[11px] font-semibold text-slate-400">
+                    Klik <strong>Reset Sandi</strong> jika pustakawan lupa kata sandi.
+                </span>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <template x-for="staff in filteredStaff" :key="staff.id">
-                <article class="rounded-2xl border border-slate-200/80 p-4 sm:p-5 space-y-4 bg-slate-50/40 flex flex-col justify-between">
+                <article 
+                    class="rounded-2xl border p-4 sm:p-5 space-y-4 flex flex-col justify-between transition-colors"
+                    :class="isSelected(staff.id) ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200/80 bg-slate-50/40'"
+                >
                     <div class="space-y-3">
                         <div class="flex items-start justify-between gap-3">
                             <div class="flex items-center gap-3 min-w-0">
+                                <input 
+                                    type="checkbox" 
+                                    x-show="Number(staff.id) !== currentAdminId"
+                                    :checked="isSelected(staff.id)"
+                                    @change="toggleSelect(staff.id)"
+                                    class="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer shrink-0"
+                                >
                                 <span 
                                     class="w-11 h-11 rounded-full flex items-center justify-center font-extrabold text-sm shrink-0"
                                     :style="`background-color: ${staff.palette.bg}; color: ${staff.palette.text};`"
@@ -367,7 +478,8 @@
 
                             <button 
                                 type="button"
-                                @click="removeStaff(staff)"
+                                x-show="Number(staff.id) !== currentAdminId"
+                                @click="openSingleDelete(staff)"
                                 :disabled="busyStaffId === staff.id"
                                 title="Hapus akun petugas"
                                 class="w-8 h-8 rounded-xl border border-slate-200 bg-white hover:border-rose-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors"
@@ -380,6 +492,54 @@
             </template>
         </div>
     </section>
+
+    <!-- Modal Pop-up Konfirmasi Hapus Petugas (Satuan & Pilih Banyak) -->
+    <div 
+        x-cloak
+        x-show="deleteModalOpen"
+        x-transition
+        class="fixed inset-0 !mt-0 z-50 flex items-center justify-center p-4"
+    >
+        <div class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm" @click="deleteModalOpen = false"></div>
+        <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-5 sm:p-6 z-10 text-center space-y-4">
+            <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center mx-auto text-2xl">
+                <i class="ph-bold ph-trash"></i>
+            </div>
+
+            <div class="space-y-1.5">
+                <h3 class="text-base sm:text-lg font-extrabold text-slate-900" x-text="deleteMode === 'bulk' ? 'Hapus ' + selectedIds.length + ' Petugas Sekaligus?' : 'Hapus Akun Petugas?'"></h3>
+                <template x-if="deleteMode === 'single' && deleteTargetStaff">
+                    <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                        Apakah Anda yakin ingin menghapus akun petugas <strong class="text-slate-800" x-text="deleteTargetStaff.name + ' (' + deleteTargetStaff.email + ')'"></strong> secara permanen?
+                    </p>
+                </template>
+                <template x-if="deleteMode === 'bulk'">
+                    <p class="text-xs sm:text-sm text-slate-500 leading-relaxed">
+                        Apakah Anda yakin ingin menghapus <strong class="text-rose-600" x-text="selectedIds.length + ' akun petugas yang dipilih'"></strong> secara permanen dari sistem?
+                    </p>
+                </template>
+            </div>
+
+            <div class="pt-2 flex items-center gap-2.5">
+                <button 
+                    type="button" 
+                    @click="deleteModalOpen = false"
+                    class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm transition-colors"
+                >
+                    Batal
+                </button>
+                <button 
+                    type="button"
+                    @click="confirmDeleteStaff()"
+                    :disabled="deletingStaff"
+                    class="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-rose-500/20 transition-all inline-flex items-center justify-center gap-1.5"
+                >
+                    <i class="ph-bold ph-trash text-sm"></i>
+                    <span x-text="deletingStaff ? 'Menghapus...' : 'Ya, Hapus'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal tambah petugas -->
     <div 
