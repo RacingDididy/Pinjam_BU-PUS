@@ -3,6 +3,9 @@ name: pinjam-bu-pus
 owner: bandul
 package: .
 debug: false
+volumes:
+  - name: storage
+    mount: /data
 env:
   APP_NAME: "PINJAM BU-PUS"
   APP_ENV: production
@@ -12,7 +15,7 @@ env:
   APP_LOCALE: id
   APP_FALLBACK_LOCALE: id
   DB_CONNECTION: sqlite
-  DB_DATABASE: /app/database/database.sqlite
+  DB_DATABASE: /data/database.sqlite
   SESSION_DRIVER: cookie
   CACHE_STORE: array
   VIEW_COMPILED_PATH: /tmp

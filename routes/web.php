@@ -12,6 +12,18 @@ use Illuminate\Support\Facades\Route;
 
 // Halaman publik
 Route::get('/', [HomeController::class, 'index'])->name('home');
+Route::get('/media/covers/{filename}', function (string $filename) {
+    $safeName = basename($filename);
+    $path = is_dir('/data/covers') && file_exists('/data/covers/'.$safeName)
+        ? '/data/covers/'.$safeName
+        : public_path('covers/'.$safeName);
+
+    abort_unless(file_exists($path), 404);
+
+    return response()->file($path, [
+        'Cache-Control' => 'public, max-age=31536000',
+    ]);
+})->name('media.covers');
 Route::get('/locale/{locale}', [HomeController::class, 'switchLocale'])->name('locale.switch');
 Route::get('/informasi/aturan-peminjaman', [HomeController::class, 'aturanPeminjaman'])->name('informasi.aturan-peminjaman');
 Route::get('/informasi/panduan-pengembalian', [HomeController::class, 'panduanPengembalian'])->name('informasi.panduan-pengembalian');

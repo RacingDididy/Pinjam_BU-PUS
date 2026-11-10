@@ -9,6 +9,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
 class BukuController extends Controller
@@ -60,17 +61,9 @@ class BukuController extends Controller
             'sinopsis' => 'nullable|string',
         ]);
 
-        $coversDir = public_path('covers');
-        if (! is_dir($coversDir)) {
-            mkdir($coversDir, 0755, true);
-        }
-
         // 1. Gambar Depan (Sampul Utama)
         if ($request->hasFile('cover_file')) {
-            $file = $request->file('cover_file');
-            $filename = 'cover_front_'.time().'_'.Str::random(6).'.'.$file->getClientOriginalExtension();
-            $file->move($coversDir, $filename);
-            $validated['cover_image'] = '/covers/'.$filename;
+            $validated['cover_image'] = $this->storeCoverFile($request->file('cover_file'), 'cover_front');
         } elseif (! empty($validated['cover_image'])) {
             $validated['cover_image'] = trim($validated['cover_image']);
         } else {
@@ -81,20 +74,14 @@ class BukuController extends Controller
         if ($request->boolean('use_extra_images')) {
             $sideImage = null;
             if ($request->hasFile('side_file')) {
-                $file = $request->file('side_file');
-                $filename = 'cover_side_'.time().'_'.Str::random(6).'.'.$file->getClientOriginalExtension();
-                $file->move($coversDir, $filename);
-                $sideImage = '/covers/'.$filename;
+                $sideImage = $this->storeCoverFile($request->file('side_file'), 'cover_side');
             } elseif (! empty($validated['side_image'])) {
                 $sideImage = trim($validated['side_image']);
             }
 
             $backImage = null;
             if ($request->hasFile('back_file')) {
-                $file = $request->file('back_file');
-                $filename = 'cover_back_'.time().'_'.Str::random(6).'.'.$file->getClientOriginalExtension();
-                $file->move($coversDir, $filename);
-                $backImage = '/covers/'.$filename;
+                $backImage = $this->storeCoverFile($request->file('back_file'), 'cover_back');
             } elseif (! empty($validated['back_image'])) {
                 $backImage = trim($validated['back_image']);
             }
@@ -169,17 +156,9 @@ class BukuController extends Controller
             'sinopsis' => 'nullable|string',
         ]);
 
-        $coversDir = public_path('covers');
-        if (! is_dir($coversDir)) {
-            mkdir($coversDir, 0755, true);
-        }
-
         // 1. Gambar Depan
         if ($request->hasFile('cover_file')) {
-            $file = $request->file('cover_file');
-            $filename = 'cover_front_'.time().'_'.Str::random(6).'.'.$file->getClientOriginalExtension();
-            $file->move($coversDir, $filename);
-            $validated['cover_image'] = '/covers/'.$filename;
+            $validated['cover_image'] = $this->storeCoverFile($request->file('cover_file'), 'cover_front');
         } elseif (! empty($validated['cover_image'])) {
             $validated['cover_image'] = trim($validated['cover_image']);
         } else {
@@ -193,19 +172,13 @@ class BukuController extends Controller
             $backImage = $existingGallery[1] ?? null;
 
             if ($request->hasFile('side_file')) {
-                $file = $request->file('side_file');
-                $filename = 'cover_side_'.time().'_'.Str::random(6).'.'.$file->getClientOriginalExtension();
-                $file->move($coversDir, $filename);
-                $sideImage = '/covers/'.$filename;
+                $sideImage = $this->storeCoverFile($request->file('side_file'), 'cover_side');
             } elseif (! empty($validated['side_image'])) {
                 $sideImage = trim($validated['side_image']);
             }
 
             if ($request->hasFile('back_file')) {
-                $file = $request->file('back_file');
-                $filename = 'cover_back_'.time().'_'.Str::random(6).'.'.$file->getClientOriginalExtension();
-                $file->move($coversDir, $filename);
-                $backImage = '/covers/'.$filename;
+                $backImage = $this->storeCoverFile($request->file('back_file'), 'cover_back');
             } elseif (! empty($validated['back_image'])) {
                 $backImage = trim($validated['back_image']);
             }
@@ -274,5 +247,19 @@ class BukuController extends Controller
         }
 
         return redirect()->route('pustakawan.buku.index')->with('success', $msg);
+    }
+
+    private function storeCoverFile(UploadedFile $file, string $prefix): string
+    {
+        $filename = $prefix.'_'.time().'_'.Str::random(6).'.'.$file->getClientOriginalExtension();
+        $targetDir = is_dir('/data') ? '/data/covers' : public_path('covers');
+
+        if (! is_dir($targetDir)) {
+            mkdir($targetDir, 0755, true);
+        }
+
+        $file->move($targetDir, $filename);
+
+        return is_dir('/data') ? '/media/covers/'.$filename : '/covers/'.$filename;
     }
 }

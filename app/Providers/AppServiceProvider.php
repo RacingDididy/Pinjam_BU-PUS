@@ -36,6 +36,15 @@ class AppServiceProvider extends ServiceProvider
 
         if (! $this->app->runningInConsole() && config('database.default') === 'sqlite') {
             try {
+                $dbPath = config('database.connections.sqlite.database');
+                if ($dbPath && $dbPath !== ':memory:' && ! file_exists($dbPath)) {
+                    $dir = dirname($dbPath);
+                    if (! is_dir($dir)) {
+                        @mkdir($dir, 0777, true);
+                    }
+                    @touch($dbPath);
+                }
+
                 if (! Schema::hasTable('kategoris')) {
                     Artisan::call('migrate', ['--force' => true, '--seed' => true]);
                 }

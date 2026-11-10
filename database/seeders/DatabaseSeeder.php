@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Kategori;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -44,9 +45,23 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $this->call([
-            BukuSeeder::class,
-            LaskarPelangiSeeder::class,
-        ]);
+        $kategoriList = [
+            'Pelajaran' => 'Buku paket sekolah, kamus, dan modul belajar',
+            'Novel' => 'Karya sastra dan novel fiksi best seller',
+            'Pengembangan Diri' => 'Buku motivasi, pengembangan diri, dan psikologi terapan',
+            'Bisnis dan Ekonomi' => 'Buku finansial, investasi, dan bisnis praktis',
+            'Komik' => 'Koleksi komik bergambar populer dan manga',
+            'Agama' => 'Kajian sejarah, fiqih, dan literatur keagamaan',
+            'Hukum dan Politik' => 'Kajian tata negara, hukum perundang-undangan',
+            'Resep' => 'Aneka resep masakan nusantara dan internasional',
+            'Lainnya' => 'Kategori bacaan umum dan ensiklopedia',
+        ];
+
+        foreach ($kategoriList as $nama => $deskripsi) {
+            Kategori::firstOrCreate(
+                ['nama_kategori' => $nama],
+                ['deskripsi' => $deskripsi]
+            );
+        }
     }
 }
