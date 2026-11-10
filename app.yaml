@@ -18,3 +18,4 @@ env:
   VIEW_COMPILED_PATH: /tmp
   LOG_CHANNEL: stderr
   MAIL_MAILER: log
+app_id: da_RrWI0t5Uj00G
