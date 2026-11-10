@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 450" width="100%" height="100%">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b" stop-opacity="1" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.85" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="300" height="450" fill="url(#grad)" rx="16"/>
+  <rect x="12" y="12" width="276" height="426" fill="none" stroke="#818cf8" stroke-width="1.5" stroke-dasharray="4,4" opacity="0.3" rx="12"/>
+  
+  <!-- Spine shadow -->
+  <rect x="0" y="0" width="18" height="450" fill="rgba(0,0,0,0.18)" rx="4"/>
+  <line x1="18" y1="0" x2="18" y2="450" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+
+  <!-- Badge -->
+  <g transform="translate(185, 26)">
+    <rect width="90" height="24" rx="12" fill="#818cf8" opacity="0.9"/>
+    <text x="45" y="16" font-family="'Inter', sans-serif" font-size="9" font-weight="700" fill="#ffffff" text-anchor="middle" letter-spacing="1">HUKUM</text>
+  </g>
+
+  <!-- Graphic elements -->
+  <circle cx="150" cy="180" r="65" fill="none" stroke="#818cf8" stroke-width="2" opacity="0.25"/>
+  <circle cx="150" cy="180" r="45" fill="#818cf8" opacity="0.15"/>
+  <path d="M135 180 L165 180 M150 165 L150 195" stroke="#818cf8" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- Content -->
+  <g transform="translate(30, 290)">
+    <text x="0" y="0" font-family="'Inter', sans-serif" font-size="10" font-weight="600" fill="#818cf8" letter-spacing="2">EDISI LENGKAP</text>
+    <text x="0" y="24" font-family="'Inter', sans-serif" font-size="18" font-weight="800" fill="#ffffff" width="240">
+      Omnibus Law
+    </text>
+    <text x="0" y="58" font-family="'Inter', sans-serif" font-size="12" font-weight="500" fill="#94a3b8">
+      Dr. Ahmad Fauzi
+    </text>
+  </g>
+</svg>
