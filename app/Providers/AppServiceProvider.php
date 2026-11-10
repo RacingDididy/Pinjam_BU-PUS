@@ -4,9 +4,12 @@ namespace App\Providers;
 
 use App\Http\Controllers\BukuController;
 use App\Models\Kategori;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,8 +29,19 @@ class AppServiceProvider extends ServiceProvider
         if (
             request()->header('X-Forwarded-Proto') === 'https'
             || str_contains((string) request()->getHost(), 'ngrok')
+            || str_contains((string) request()->getHost(), 'wasmer.app')
         ) {
             URL::forceScheme('https');
+        }
+
+        if (! $this->app->runningInConsole() && config('database.default') === 'sqlite') {
+            try {
+                if (! Schema::hasTable('kategoris')) {
+                    Artisan::call('migrate', ['--force' => true, '--seed' => true]);
+                }
+            } catch (Throwable) {
+                //
+            }
         }
 
         View::composer('layouts.app', function ($view): void {

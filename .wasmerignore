@@ -11,3 +11,4 @@
 sipus_db
 !/vendor
 !database/database.sqlite
+

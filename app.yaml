@@ -1,17 +1,20 @@
 kind: wasmer.io/App.v0
 name: pinjam-bu-pus
+owner: bandul
 package: .
-debug: true
+debug: false
 env:
   APP_NAME: "PINJAM BU-PUS"
   APP_ENV: production
-  APP_DEBUG: "true"
+  APP_DEBUG: "false"
+  APP_URL: "https://pinjam-bu-pus.wasmer.app"
   APP_KEY: "base64:8xJ9vK2mN5pQ7rT0wY3zA6bC9dE2fG5hI8jK1lM4nO8="
   APP_LOCALE: id
   APP_FALLBACK_LOCALE: id
   DB_CONNECTION: sqlite
   DB_DATABASE: /app/database/database.sqlite
   SESSION_DRIVER: cookie
-  CACHE_STORE: database
+  CACHE_STORE: array
+  VIEW_COMPILED_PATH: /tmp
   LOG_CHANNEL: stderr
   MAIL_MAILER: log
