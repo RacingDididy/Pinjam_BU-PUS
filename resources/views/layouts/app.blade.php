@@ -114,7 +114,43 @@
                 this.networkBusy = false;
             }
         },
+        reloadPreservingScroll(targetUrl = null) {
+            try {
+                sessionStorage.setItem('pinjam_scroll_restore', JSON.stringify({
+                    path: targetUrl ? new URL(targetUrl, window.location.origin).pathname : window.location.pathname,
+                    y: window.scrollY || 0,
+                    ts: Date.now()
+                }));
+            } catch (e) {}
+            if (targetUrl) {
+                window.location.href = targetUrl;
+            } else {
+                window.location.reload();
+            }
+        },
         initNetworkMonitor() {
+            try {
+                const rawScroll = sessionStorage.getItem('pinjam_scroll_restore');
+                if (rawScroll) {
+                    sessionStorage.removeItem('pinjam_scroll_restore');
+                    const parsed = JSON.parse(rawScroll);
+                    if (parsed && parsed.path === window.location.pathname && (Date.now() - parsed.ts) < 15000 && parsed.y > 0) {
+                        requestAnimationFrame(() => window.scrollTo({ top: parsed.y, behavior: 'instant' }));
+                    }
+                }
+            } catch (e) {}
+            document.addEventListener('submit', (e) => {
+                const form = e.target;
+                if (form && form.method && form.method.toUpperCase() === 'POST' && !form.hasAttribute('data-ajax-catalog-form')) {
+                    try {
+                        sessionStorage.setItem('pinjam_scroll_restore', JSON.stringify({
+                            path: window.location.pathname,
+                            y: window.scrollY || 0,
+                            ts: Date.now()
+                        }));
+                    } catch (err) {}
+                }
+            });
             const origFetch = window.fetch;
             const self = this;
             window.fetch = async function(...args) {
@@ -171,10 +207,15 @@
                 this.cartBusy = false;
             }
         },
-        async updateCartQty(bookId, action) {
+        async updateCartQty(bookId, action, qty = null) {
             if (this.cartBusy) return;
             this.cartBusy = true;
             try {
+                const payload = { action };
+                if (action === 'set' && qty !== null) {
+                    const parsed = parseInt(qty, 10);
+                    payload.qty = isNaN(parsed) ? 1 : Math.max(0, parsed);
+                }
                 const res = await fetch(`/buku/${bookId}/cart`, {
                     method: 'PATCH',
                     headers: {
@@ -182,7 +223,7 @@
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
                     },
-                    body: JSON.stringify({ action })
+                    body: JSON.stringify(payload)
                 });
                 if (res.status === 401) {
                     this.openAuthModal('{{ __('meminjam buku') }}');
@@ -241,7 +282,8 @@
         authLoading: false,
         authError: '',
         authSuccessMsg: '',
-        devVerifyUrl: '',
+        otpCodeInput: '',
+        generatedOtpCode: '',
         verifyPollTimer: null,
         openAuthModal(action = '{{ __('melanjutkan') }}', step = 'login') {
             this.authModalAction = action || '{{ __('melanjutkan') }}';
@@ -323,10 +365,11 @@
                     } else if (data.redirect && window.location.pathname === '/login') {
                         window.location.href = data.redirect;
                     } else {
-                        window.location.reload();
+                        this.reloadPreservingScroll();
                     }
                 } else if (data.needs_verification) {
-                    this.devVerifyUrl = data.dev_verification_url || '';
+                    this.generatedOtpCode = data.verification_code || '';
+                    this.otpCodeInput = '';
                     this.authSuccessMsg = data.message;
                     this.switchAuthStep('waiting_verification');
                 } else {
@@ -357,8 +400,9 @@
                 });
                 const data = await res.json();
                 if (res.ok && data.success) {
-                    this.devVerifyUrl = data.dev_verification_url || '';
-                    this.authSuccessMsg = data.message || 'Email verifikasi telah dikirim.';
+                    this.generatedOtpCode = data.verification_code || '';
+                    this.otpCodeInput = '';
+                    this.authSuccessMsg = data.message || 'Kode verifikasi telah dikirim.';
                     this.switchAuthStep('waiting_verification');
                 } else if (data.already_registered) {
                     this.authError = data.message;
@@ -399,8 +443,9 @@
                     this.authSuccessMsg = data.message || 'Identitas terverifikasi! Silakan buat kata sandi baru.';
                     this.switchAuthStep('set_password');
                 } else if (res.ok && data.success) {
-                    this.devVerifyUrl = data.dev_verification_url || '';
-                    this.authSuccessMsg = data.message || 'Tautan pemulihan kata sandi telah dikirim ke email Anda.';
+                    this.generatedOtpCode = data.verification_code || '';
+                    this.otpCodeInput = '';
+                    this.authSuccessMsg = data.message || 'Kode pemulihan kata sandi telah dikirim ke email Anda.';
                     this.switchAuthStep('waiting_verification');
                 } else {
                     const firstErr = data.errors ? Object.values(data.errors)[0][0] : null;
@@ -430,11 +475,11 @@
                 if (res.ok && data.verified) {
                     this.switchAuthStep('set_password');
                 } else if (res.ok && data.success) {
-                    this.devVerifyUrl = data.dev_verification_url || this.devVerifyUrl;
+                    this.generatedOtpCode = data.verification_code || this.generatedOtpCode;
                     this.authSuccessMsg = data.message;
                     this.showToast(data.message, 'success');
                 } else {
-                    this.authError = data.message || 'Gagal mengirim ulang email verifikasi.';
+                    this.authError = data.message || 'Gagal mengirim ulang kode verifikasi.';
                 }
             } catch (e) {
                 this.authError = 'Gagal menghubungi server.';
@@ -442,12 +487,27 @@
                 this.authLoading = false;
             }
         },
-        async triggerDirectVerifyLink() {
-            if (!this.devVerifyUrl || this.authLoading) return;
+        async submitOtpCodeVerify() {
+            const cleanCode = (this.otpCodeInput || '').replace(/\D/g, '');
+            if (cleanCode.length !== 6) {
+                this.authError = 'Masukkan 6 digit angka kode verifikasi.';
+                return;
+            }
+            if (this.authLoading) return;
             this.authLoading = true;
+            this.authError = '';
             try {
-                const res = await fetch(this.devVerifyUrl, {
-                    headers: { 'Accept': 'application/json' }
+                const res = await fetch('{{ route('verification.verify') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                    },
+                    body: JSON.stringify({
+                        email: this.authEmail,
+                        code: cleanCode
+                    })
                 });
                 const data = await res.json();
                 if (res.ok && data.verified) {
@@ -455,11 +515,14 @@
                     this.authPassword = '';
                     this.authPasswordConfirm = '';
                     this.authError = '';
-                    this.authSuccessMsg = data.message || 'Verifikasi email berhasil! Silakan buat kata sandi Anda.';
+                    this.authSuccessMsg = data.message || 'Kode verifikasi berhasil! Silakan buat kata sandi Anda.';
                     this.authStep = 'set_password';
+                    this.showToast('Kode terverifikasi! Silakan buat kata sandi.', 'success');
+                } else {
+                    this.authError = data.message || 'Kode verifikasi tidak sesuai.';
                 }
             } catch (e) {
-                window.location.href = this.devVerifyUrl;
+                this.authError = 'Terjadi gangguan jaringan saat memverifikasi kode.';
             } finally {
                 this.authLoading = false;
             }
@@ -498,7 +561,7 @@
                 if (res.ok && data.success) {
                     this.authModalOpen = false;
                     const cleanUrl = window.location.pathname;
-                    window.location.href = cleanUrl;
+                    this.reloadPreservingScroll(cleanUrl);
                 } else {
                     const firstErr = data.errors ? Object.values(data.errors)[0][0] : null;
                     this.authError = firstErr || data.message || 'Gagal menyimpan kata sandi.';
@@ -887,7 +950,7 @@
                                 <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate" x-text="item.pengarang"></p>
 
                                 <div class="mt-2.5 flex items-center justify-between gap-2 flex-wrap">
-                                    <!-- +/- Quantity Stepper -->
+                                    <!-- +/- Quantity Stepper (Typable) -->
                                     <div class="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 shadow-sm">
                                         <button 
                                             type="button"
@@ -898,7 +961,16 @@
                                         >
                                             <i class="ph-bold ph-minus text-xs" aria-hidden="true"></i>
                                         </button>
-                                        <span class="min-w-[28px] text-center text-xs font-extrabold text-slate-900 dark:text-white select-none" x-text="item.qty"></span>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            :max="item.stok"
+                                            :value="item.qty"
+                                            @change="updateCartQty(item.id, 'set', $event.target.value)"
+                                            @keydown.enter.prevent="$event.target.blur()"
+                                            aria-label="Ketik jumlah buku"
+                                            class="w-11 h-7 text-center text-xs font-extrabold text-slate-900 dark:text-white bg-transparent border-x border-slate-100 dark:border-slate-800 outline-none focus:bg-blue-50/60 dark:focus:bg-blue-950/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        >
                                         <button 
                                             type="button"
                                             @click="updateCartQty(item.id, 'increment')"
@@ -1242,34 +1314,50 @@
 
             <!-- Menunggu verifikasi email -->
             <div x-show="authStep === 'waiting_verification'" class="space-y-3.5 text-center" style="display: none;">
-                <div class="p-4 rounded-2xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/80 space-y-2.5">
+                <div class="p-4 rounded-2xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/80 space-y-2">
                     <div class="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto text-xl shadow-sm">
-                        <i class="ph-bold ph-envelope-open animate-bounce" aria-hidden="true"></i>
+                        <i class="ph-bold ph-shield-check" aria-hidden="true"></i>
                     </div>
                     <p class="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
-                        Silakan buka kotak masuk <strong>Gmail</strong> Anda lalu tekan tombol <strong>"Verifikasi Email &amp; Buat Password"</strong>.
+                        Masukkan <strong>6 digit kode verifikasi</strong> yang dikirim ke <strong x-text="authEmail"></strong>, atau tekan tombol konfirmasi di kotak masuk Gmail Anda.
                     </p>
-                    <div class="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                        <i class="ph-bold ph-spinner animate-spin" aria-hidden="true"></i>
-                        <span>Menunggu Anda menekan tombol verifikasi di email...</span>
+                    <div x-show="generatedOtpCode" class="pt-1">
+                        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 shadow-xs">
+                            <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Kode Anda:</span>
+                            <strong class="font-mono text-sm font-extrabold tracking-widest text-blue-600 dark:text-blue-400" x-text="generatedOtpCode"></strong>
+                            <button
+                                type="button"
+                                @click="otpCodeInput = generatedOtpCode; submitOtpCodeVerify()"
+                                class="px-2 py-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] transition-colors"
+                            >
+                                Pakai Kode
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Local Dev Simulation Button if MAIL_MAILER=log -->
-                <div x-show="devVerifyUrl" class="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 space-y-2">
-                    <p class="text-[11px] font-semibold text-amber-800 dark:text-amber-300">
-                        Mode Lokal Terdeteksi: Klik tombol di bawah untuk mensimulasikan menekan tombol verifikasi di Gmail:
-                    </p>
-                    <button 
-                        type="button"
-                        @click="triggerDirectVerifyLink()"
-                        :disabled="authLoading"
-                        class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs inline-flex items-center justify-center gap-1.5 shadow-sm transition-colors"
+                <form @submit.prevent="submitOtpCodeVerify()" class="space-y-2.5 text-left">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 text-center">Kode Verifikasi (6 Digit)</label>
+                        <input
+                            type="text"
+                            inputmode="numeric"
+                            maxlength="6"
+                            x-model="otpCodeInput"
+                            @input="otpCodeInput = otpCodeInput.replace(/\D/g, '').slice(0, 6); if (otpCodeInput.length === 6) submitOtpCodeVerify();"
+                            placeholder="• • • • • •"
+                            class="w-full text-center font-mono text-lg sm:text-xl font-extrabold tracking-[0.45em] bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-blue-600 transition-colors"
+                        >
+                    </div>
+                    <button
+                        type="submit"
+                        :disabled="authLoading || (otpCodeInput || '').length !== 6"
+                        class="w-full min-h-[42px] bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm py-2.5 rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                        <i class="ph-bold ph-check-circle text-sm" aria-hidden="true"></i>
-                        <span>Verifikasi Email Sekarang (Klik Tombol Gmail)</span>
+                        <i class="ph-bold text-base" :class="authLoading ? 'ph-spinner animate-spin' : 'ph-check-circle'" aria-hidden="true"></i>
+                        <span x-text="authLoading ? 'Memverifikasi...' : 'Verifikasi Kode Sekarang'"></span>
                     </button>
-                </div>
+                </form>
 
                 <div class="flex items-center justify-between gap-2 pt-1 text-xs">
                     <button 
@@ -1278,7 +1366,7 @@
                         :disabled="authLoading"
                         class="font-bold text-blue-600 dark:text-blue-400 hover:underline"
                     >
-                        Kirim Ulang Email
+                        Kirim Ulang Kode
                     </button>
                     <button 
                         type="button"

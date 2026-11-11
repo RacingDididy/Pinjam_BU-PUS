@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Buku;
 use App\Models\Kategori;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -42,10 +43,14 @@ class BukuController extends Controller
 
     public function store(Request $request): RedirectResponse|JsonResponse
     {
+        $resolvedDates = $this->resolveTanggalDanTahunTerbit($request);
+        $request->merge($resolvedDates);
+
         $validated = $request->validate([
             'judul' => 'required|string|max:255',
             'pengarang' => 'required|string|max:255',
             'penerbit' => 'required|string|max:255',
+            'tanggal_terbit' => 'required|date',
             'tahun_terbit' => 'required|integer|min:1900|max:'.(date('Y') + 1),
             'isbn' => 'required|string|max:50|unique:bukus,isbn',
             'kategori_id' => 'required|exists:kategoris,id',
@@ -114,6 +119,8 @@ class BukuController extends Controller
                     'judul' => $buku->judul,
                     'pengarang' => $buku->pengarang,
                     'penerbit' => $buku->penerbit,
+                    'tanggal_terbit' => $buku->tanggal_terbit?->format('Y-m-d'),
+                    'tanggal_terbit_formatted' => $buku->tanggal_terbit_formatted,
                     'tahun_terbit' => $buku->tahun_terbit,
                     'isbn' => $buku->isbn,
                     'stok' => (int) $buku->stok,
@@ -137,10 +144,14 @@ class BukuController extends Controller
 
     public function update(Request $request, Buku $buku): RedirectResponse|JsonResponse
     {
+        $resolvedDates = $this->resolveTanggalDanTahunTerbit($request, $buku);
+        $request->merge($resolvedDates);
+
         $validated = $request->validate([
             'judul' => 'required|string|max:255',
             'pengarang' => 'required|string|max:255',
             'penerbit' => 'required|string|max:255',
+            'tanggal_terbit' => 'required|date',
             'tahun_terbit' => 'required|integer|min:1900|max:'.(date('Y') + 1),
             'isbn' => 'required|string|max:50|unique:bukus,isbn,'.$buku->id,
             'kategori_id' => 'required|exists:kategoris,id',
@@ -247,6 +258,102 @@ class BukuController extends Controller
         }
 
         return redirect()->route('pustakawan.buku.index')->with('success', $msg);
+    }
+
+    public function updateStock(Request $request, Buku $buku): JsonResponse
+    {
+        $validated = $request->validate([
+            'stok' => ['required', 'integer', 'min:0', 'max:9999'],
+        ]);
+
+        $buku->update([
+            'stok' => (int) $validated['stok'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'stok' => (int) $buku->stok,
+            'message' => "Stok buku \"{$buku->judul}\" diperbarui menjadi {$buku->stok} eksemplar.",
+        ]);
+    }
+
+    public function quickStoreKategori(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'nama_kategori' => ['required', 'string', 'max:100', 'unique:kategoris,nama_kategori'],
+            'deskripsi' => ['nullable', 'string', 'max:255'],
+        ], [
+            'nama_kategori.required' => 'Nama kategori wajib diisi.',
+            'nama_kategori.unique' => 'Kategori ini sudah tersedia.',
+        ]);
+
+        $kategori = Kategori::create([
+            'nama_kategori' => trim($validated['nama_kategori']),
+            'deskripsi' => $validated['deskripsi'] ?? 'Koleksi buku '.trim($validated['nama_kategori']),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'kategori' => [
+                'id' => $kategori->id,
+                'nama_kategori' => $kategori->nama_kategori,
+                'deskripsi' => $kategori->deskripsi,
+            ],
+            'message' => "Kategori \"{$kategori->nama_kategori}\" berhasil ditambahkan!",
+        ]);
+    }
+
+    /**
+     * @return array{tanggal_terbit: string, tahun_terbit: int}
+     */
+    private function resolveTanggalDanTahunTerbit(Request $request, ?Buku $buku = null): array
+    {
+        if ($request->filled('tanggal_terbit')) {
+            try {
+                $dt = Carbon::parse((string) $request->input('tanggal_terbit'));
+
+                return [
+                    'tanggal_terbit' => $dt->format('Y-m-d'),
+                    'tahun_terbit' => (int) $dt->format('Y'),
+                ];
+            } catch (\Throwable) {
+            }
+        }
+
+        if ($request->filled('tgl_tahun')) {
+            $year = max(1900, min((int) date('Y') + 1, (int) $request->input('tgl_tahun')));
+            $month = max(1, min(12, (int) $request->input('tgl_bulan', 1)));
+            $maxDay = cal_days_in_month(CAL_GREGORIAN, $month, $year);
+            $day = max(1, min($maxDay, (int) $request->input('tgl_hari', 1)));
+
+            return [
+                'tanggal_terbit' => sprintf('%04d-%02d-%02d', $year, $month, $day),
+                'tahun_terbit' => $year,
+            ];
+        }
+
+        if ($request->filled('tahun_terbit')) {
+            $year = max(1900, min((int) date('Y') + 1, (int) $request->input('tahun_terbit')));
+
+            return [
+                'tanggal_terbit' => sprintf('%04d-01-15', $year),
+                'tahun_terbit' => $year,
+            ];
+        }
+
+        if ($buku && $buku->tanggal_terbit) {
+            return [
+                'tanggal_terbit' => $buku->tanggal_terbit->format('Y-m-d'),
+                'tahun_terbit' => (int) $buku->tanggal_terbit->format('Y'),
+            ];
+        }
+
+        $now = now();
+
+        return [
+            'tanggal_terbit' => $now->format('Y-m-d'),
+            'tahun_terbit' => (int) $now->format('Y'),
+        ];
     }
 
     private function storeCoverFile(UploadedFile $file, string $prefix): string

@@ -3,7 +3,67 @@
 @section('title', __('Perpustakaan Buku') . ' - PINJAM BU-PUS')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-7 space-y-5 sm:space-y-6">
+<div 
+    id="perpustakaan-dynamic-area"
+    x-data="{
+        loadingCatalog: false,
+        async loadCatalogUrl(url, pushHistory = true) {
+            if (!url || this.loadingCatalog) return;
+            this.loadingCatalog = true;
+            try {
+                const res = await fetch(url, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const html = await res.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const nextArea = doc.getElementById('perpustakaan-dynamic-content');
+                const currentArea = document.getElementById('perpustakaan-dynamic-content');
+                if (nextArea && currentArea) {
+                    currentArea.innerHTML = nextArea.innerHTML;
+                    if (window.Alpine) {
+                        window.Alpine.initTree(currentArea);
+                    }
+                    if (pushHistory) {
+                        window.history.pushState({ catalogUrl: url }, '', url);
+                    }
+                } else {
+                    window.location.href = url;
+                }
+            } catch (e) {
+                window.location.href = url;
+            } finally {
+                this.loadingCatalog = false;
+            }
+        },
+        handleCatalogClick(e) {
+            const link = e.target.closest('a[data-ajax-catalog], .pagination a, nav[role=navigation] a');
+            if (!link) return;
+            const href = link.getAttribute('href');
+            if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+            e.preventDefault();
+            this.loadCatalogUrl(href, true);
+        },
+        handleCatalogSearch(e) {
+            const form = e.target.closest('form[data-ajax-catalog-form]');
+            if (!form) return;
+            e.preventDefault();
+            const formData = new FormData(form);
+            const params = new URLSearchParams();
+            for (const [k, v] of formData.entries()) {
+                if (String(v).trim() !== '') params.set(k, String(v).trim());
+            }
+            const base = form.getAttribute('action') || window.location.pathname;
+            const qs = params.toString();
+            this.loadCatalogUrl(qs ? `${base}?${qs}` : base, true);
+        }
+    }"
+    @click="handleCatalogClick($event)"
+    @submit="handleCatalogSearch($event)"
+    @popstate.window="loadCatalogUrl(window.location.href, false)"
+    class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-7"
+>
+<div id="perpustakaan-dynamic-content" class="space-y-5 sm:space-y-6 transition-opacity duration-150" :class="loadingCatalog ? 'opacity-60 pointer-events-none' : 'opacity-100'">
 
     <!-- Breadcrumb Pills -->
     <nav aria-label="Breadcrumb" class="flex items-center gap-1.5 text-xs overflow-x-auto no-scrollbar">
@@ -17,6 +77,7 @@
         <i class="ph-bold ph-caret-right text-[10px] text-slate-400 shrink-0" aria-hidden="true"></i>
         <a 
             href="{{ route('perpustakaan.index') }}"
+            data-ajax-catalog="1"
             class="px-3 py-1.5 rounded-full font-bold shrink-0 transition-colors {{ !$activeKategori ? 'bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600' }}"
         >
             {{ __('Perpustakaan') }}
@@ -52,7 +113,7 @@
         </div>
 
         <!-- Inline Catalog Search -->
-        <form action="{{ route('perpustakaan.index') }}" method="GET" class="w-full md:w-80 lg:w-96 flex items-center relative">
+        <form action="{{ route('perpustakaan.index') }}" method="GET" data-ajax-catalog-form="1" class="w-full md:w-80 lg:w-96 flex items-center relative">
             @if(request('kategori'))
                 <input type="hidden" name="kategori" value="{{ request('kategori') }}">
             @endif
@@ -79,6 +140,7 @@
         <div class="flex items-center sm:flex-wrap gap-2 overflow-x-auto sm:overflow-visible no-scrollbar pb-0.5">
             <a 
                 href="{{ route('perpustakaan.index', array_filter(['search' => request('search'), 'sort' => request('sort') !== 'terbaru' ? request('sort') : null])) }}"
+                data-ajax-catalog="1"
                 class="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors {{ !request('kategori') ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400' }}"
             >
                 {{ __('Semua') }}
@@ -86,6 +148,7 @@
             @foreach($kategoris as $kat)
                 <a 
                     href="{{ route('perpustakaan.index', array_filter(['kategori' => $kat->id, 'search' => request('search'), 'sort' => request('sort') !== 'terbaru' ? request('sort') : null])) }}"
+                    data-ajax-catalog="1"
                     class="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors {{ (int) request('kategori') === $kat->id ? 'bg-blue-600 text-white font-bold shadow-sm' : 'bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400' }}"
                 >
                     {{ $kat->nama_kategori }}
@@ -111,6 +174,7 @@
             @foreach($sortOptions as $sortKey => $sortLabel)
                 <a 
                     href="{{ route('perpustakaan.index', array_filter(['kategori' => request('kategori'), 'search' => request('search'), 'sort' => $sortKey])) }}"
+                    data-ajax-catalog="1"
                     class="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors {{ $sort === $sortKey ? 'bg-blue-600 text-white shadow-sm' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:border-blue-400' }}"
                 >
                     {{ $sortLabel }}
@@ -121,6 +185,7 @@
         @if(request('search') || request('kategori') || $sort !== 'terbaru')
             <a 
                 href="{{ route('perpustakaan.index') }}"
+                data-ajax-catalog="1"
                 class="text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 inline-flex items-center gap-1"
             >
                 <i class="ph-bold ph-arrow-counter-clockwise" aria-hidden="true"></i>
@@ -156,6 +221,7 @@
             <div class="pt-2">
                 <a 
                     href="{{ route('perpustakaan.index') }}"
+                    data-ajax-catalog="1"
                     class="min-h-[42px] px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold inline-flex items-center gap-2 transition-colors"
                 >
                     <span>{{ __('Lihat Semua Koleksi') }}</span>
@@ -164,5 +230,6 @@
         </section>
     @endif
 
+</div>
 </div>
 @endsection

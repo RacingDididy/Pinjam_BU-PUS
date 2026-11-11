@@ -3,17 +3,43 @@
 @section('title', 'Kelola Katalog Buku - Panel Pustakawan')
 @section('page-title', 'Kelola Katalog Buku')
 
+@php
+    $kategoriListJson = $kategoris->map(fn ($k) => [
+        'id' => $k->id,
+        'nama_kategori' => $k->nama_kategori,
+    ])->values();
+    $initialStocks = $bukus->getCollection()->mapWithKeys(fn ($b) => [$b->id => (int) $b->stok]);
+@endphp
+
 @section('content')
 <div 
     class="w-full" 
     x-data="{ 
         openCreateModal: false,
+        exportMenuOpen: false,
         pageIds: {{ Js::from($bukus->pluck('id')->map(fn($id) => (int) $id)->values()) }},
+        deletedIds: [],
         selectedIds: [],
+        stocks: {{ Js::from($initialStocks) }},
+        stockSavingId: null,
         deleteModalOpen: false,
+        deleteSubmitting: false,
         deleteMode: 'single',
+        deleteTargetId: null,
         deleteTargetUrl: '',
         deleteTargetTitle: '',
+        toastMsg: '',
+        toastType: 'success',
+        toastTimer: null,
+        showToast(msg, type = 'success') {
+            this.toastMsg = msg;
+            this.toastType = type;
+            if (this.toastTimer) clearTimeout(this.toastTimer);
+            this.toastTimer = setTimeout(() => { this.toastMsg = ''; }, 3500);
+        },
+        isDeleted(id) {
+            return this.deletedIds.includes(Number(id));
+        },
         isSelected(id) {
             return this.selectedIds.includes(Number(id));
         },
@@ -25,18 +51,22 @@
                 this.selectedIds.push(numId);
             }
         },
+        get activePageIds() {
+            return this.pageIds.filter(id => !this.deletedIds.includes(Number(id)));
+        },
         get isAllSelected() {
-            return this.pageIds.length > 0 && this.pageIds.every(id => this.selectedIds.includes(Number(id)));
+            return this.activePageIds.length > 0 && this.activePageIds.every(id => this.selectedIds.includes(Number(id)));
         },
         toggleSelectAll() {
             if (this.isAllSelected) {
                 this.selectedIds = [];
             } else {
-                this.selectedIds = [...this.pageIds];
+                this.selectedIds = [...this.activePageIds];
             }
         },
-        openSingleDelete(url, title) {
+        openSingleDelete(id, url, title) {
             this.deleteMode = 'single';
+            this.deleteTargetId = Number(id);
             this.deleteTargetUrl = url;
             this.deleteTargetTitle = title;
             this.deleteModalOpen = true;
@@ -45,18 +75,115 @@
             if (this.selectedIds.length === 0) return;
             this.deleteMode = 'bulk';
             this.deleteModalOpen = true;
+        },
+        async confirmDeleteAction() {
+            if (this.deleteSubmitting) return;
+            this.deleteSubmitting = true;
+            const csrf = document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}';
+            try {
+                if (this.deleteMode === 'single') {
+                    const res = await fetch(this.deleteTargetUrl, {
+                        method: 'DELETE',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf
+                        }
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        if (this.deleteTargetId) {
+                            this.deletedIds.push(this.deleteTargetId);
+                            this.selectedIds = this.selectedIds.filter(i => i !== this.deleteTargetId);
+                        }
+                        this.deleteModalOpen = false;
+                        this.showToast(data.message || 'Buku berhasil dihapus!', 'success');
+                    } else {
+                        this.showToast(data.message || 'Gagal menghapus buku.', 'error');
+                    }
+                } else {
+                    const res = await fetch('{{ route('pustakawan.buku.bulk-destroy') }}', {
+                        method: 'DELETE',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrf
+                        },
+                        body: JSON.stringify({ ids: this.selectedIds })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                        this.deletedIds.push(...this.selectedIds);
+                        this.selectedIds = [];
+                        this.deleteModalOpen = false;
+                        this.showToast(data.message || 'Buku terpilih berhasil dihapus!', 'success');
+                    } else {
+                        this.showToast(data.message || 'Gagal menghapus buku terpilih.', 'error');
+                    }
+                }
+            } catch (e) {
+                this.showToast('Terjadi gangguan jaringan saat menghapus buku.', 'error');
+            } finally {
+                this.deleteSubmitting = false;
+            }
+        },
+        async saveBookStock(bookId, newVal) {
+            let parsed = parseInt(newVal, 10);
+            if (isNaN(parsed) || parsed < 0) parsed = 0;
+            if (parsed > 9999) parsed = 9999;
+            this.stocks[bookId] = parsed;
+            this.stockSavingId = bookId;
+            const csrf = document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}';
+            try {
+                const res = await fetch(`/pustakawan/buku/${bookId}/stok`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrf
+                    },
+                    body: JSON.stringify({ stok: parsed })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    this.stocks[bookId] = data.stok;
+                    this.showToast(data.message, 'success');
+                } else {
+                    this.showToast(data.message || 'Gagal memperbarui stok.', 'error');
+                }
+            } catch (e) {
+                this.showToast('Gagal menyimpan perubahan stok.', 'error');
+            } finally {
+                this.stockSavingId = null;
+            }
         }
     }"
 >
+
+    <!-- Floating Toast Notification (No Page Reload) -->
+    <div 
+        x-show="toastMsg" 
+        x-cloak
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 translate-y-2"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 translate-y-0"
+        x-transition:leave-end="opacity-0 translate-y-2"
+        class="fixed bottom-5 right-5 z-50 max-w-sm px-4 py-3 rounded-2xl shadow-xl border flex items-center gap-2.5 text-xs sm:text-sm font-bold"
+        :class="toastType === 'error' ? 'bg-rose-600 text-white border-rose-500' : 'bg-slate-900 text-white border-slate-800'"
+    >
+        <i class="ph-fill text-lg shrink-0" :class="toastType === 'error' ? 'ph-warning-circle text-rose-200' : 'ph-check-circle text-emerald-400'"></i>
+        <span x-text="toastMsg"></span>
+    </div>
 
     <!-- Kontainer tabel buku -->
     <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         
         <!-- Pencarian dan tombol aksi -->
-        <div class="p-3.5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div class="p-3.5 sm:p-6 border-b border-slate-100 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
             
             <!-- Search Input -->
-            <form action="{{ route('pustakawan.buku.index') }}" method="GET" class="w-full sm:w-80 relative">
+            <form action="{{ route('pustakawan.buku.index') }}" method="GET" class="w-full lg:w-80 relative">
                 <input 
                     type="text" 
                     name="search" 
@@ -69,7 +196,7 @@
                 </button>
             </form>
 
-            <!-- Tombol Aksi Kanan (Hapus Banyak & Tambah Buku) -->
+            <!-- Tombol Aksi Kanan (Hapus Banyak, Export Excel, & Tambah Buku) -->
             <div class="flex flex-wrap items-center gap-2">
                 <template x-if="selectedIds.length > 0">
                     <div class="flex items-center gap-2 w-full sm:w-auto">
@@ -90,6 +217,70 @@
                         </button>
                     </div>
                 </template>
+
+                <!-- Dropdown Export Excel Data Buku -->
+                <div class="relative" @click.away="exportMenuOpen = false">
+                    <button
+                        type="button"
+                        @click="exportMenuOpen = !exportMenuOpen"
+                        class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-sm shadow-emerald-500/20 transition-all"
+                    >
+                        <i class="ph-bold ph-microsoft-excel-logo text-base sm:text-lg"></i>
+                        <span>Export Excel Buku</span>
+                        <i class="ph-bold ph-caret-down text-xs"></i>
+                    </button>
+
+                    <div
+                        x-show="exportMenuOpen"
+                        x-cloak
+                        x-transition
+                        class="absolute right-0 mt-2 w-72 rounded-2xl bg-white border border-slate-200 shadow-xl p-2 z-30 space-y-1"
+                    >
+                        <div class="px-2.5 py-1.5 border-b border-slate-100">
+                            <p class="text-[11px] font-extrabold text-slate-800 uppercase tracking-wider">Pilih Format Laporan Excel</p>
+                            <p class="text-[10px] text-slate-400">Unduh katalog buku dalam format .xlsx</p>
+                        </div>
+                        <a
+                            href="{{ route('pustakawan.export.buku', ['mode' => 'both', 'search' => request('search')]) }}"
+                            @click="exportMenuOpen = false"
+                            class="flex items-start gap-2.5 p-2.5 rounded-xl hover:bg-emerald-50 transition-colors group"
+                        >
+                            <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+                                <i class="ph-bold ph-files text-base"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-extrabold text-slate-900 group-hover:text-emerald-700">Paket Lengkap (2 Sheet)</p>
+                                <p class="text-[10px] text-slate-500">Laporan Sudah Jadi + Data Raw Mentah</p>
+                            </div>
+                        </a>
+                        <a
+                            href="{{ route('pustakawan.export.buku', ['mode' => 'formatted', 'search' => request('search')]) }}"
+                            @click="exportMenuOpen = false"
+                            class="flex items-start gap-2.5 p-2.5 rounded-xl hover:bg-blue-50 transition-colors group"
+                        >
+                            <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 mt-0.5">
+                                <i class="ph-bold ph-table text-base"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-extrabold text-slate-900 group-hover:text-blue-700">Data Sudah Jadi (Siap Cetak)</p>
+                                <p class="text-[10px] text-slate-500">Tabel rapi berformat kop SMK N 5 Surakarta</p>
+                            </div>
+                        </a>
+                        <a
+                            href="{{ route('pustakawan.export.buku', ['mode' => 'raw', 'search' => request('search')]) }}"
+                            @click="exportMenuOpen = false"
+                            class="flex items-start gap-2.5 p-2.5 rounded-xl hover:bg-slate-100 transition-colors group"
+                        >
+                            <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 mt-0.5">
+                                <i class="ph-bold ph-database text-base"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-extrabold text-slate-900">Data Raw / Mentah</p>
+                                <p class="text-[10px] text-slate-500">Kolom database murni untuk olah data lanjut</p>
+                            </div>
+                        </a>
+                    </div>
+                </div>
 
                 <button 
                     type="button"
@@ -125,6 +316,8 @@
         <div class="md:hidden divide-y divide-slate-100">
             @forelse($bukus as $buku)
                 <div 
+                    x-show="!isDeleted({{ $buku->id }})"
+                    x-transition
                     class="p-3.5 flex items-start gap-3 transition-colors"
                     :class="isSelected({{ $buku->id }}) ? 'bg-blue-50/50' : ''"
                 >
@@ -141,24 +334,45 @@
                         <img src="{{ $buku->cover_url }}" alt="{{ $buku->judul }}" class="w-full h-full object-cover">
                     </div>
 
-                    <div class="flex-1 min-w-0 space-y-1">
+                    <div class="flex-1 min-w-0 space-y-1.5">
                         <div class="flex items-start justify-between gap-2">
                             <h4 class="font-bold text-xs text-slate-900 line-clamp-2 leading-snug">
                                 {{ $buku->judul }}
                             </h4>
-                            <span class="shrink-0 px-2 py-0.5 rounded-md text-[10px] font-bold {{ $buku->stok > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700' }}">
-                                Stok: {{ $buku->stok }}
+                            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-600 border border-blue-100 shrink-0">
+                                {{ $buku->kategori->nama_kategori ?? 'Umum' }}
                             </span>
                         </div>
 
                         <p class="text-[11px] text-slate-500 truncate">
-                            {{ $buku->pengarang }} &bull; {{ $buku->tahun_terbit }}
+                            {{ $buku->pengarang }} &bull; {{ $buku->tanggal_terbit_formatted }}
                         </p>
 
                         <div class="pt-1 flex items-center justify-between gap-2">
-                            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-600 border border-blue-100 truncate max-w-[140px]">
-                                {{ $buku->kategori->nama_kategori ?? 'Umum' }}
-                            </span>
+                            <!-- Inline Typable Stock Stepper -->
+                            <div class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                                <button
+                                    type="button"
+                                    @click="saveBookStock({{ $buku->id }}, (stocks[{{ $buku->id }}] || 0) - 1)"
+                                    class="w-6 h-6 rounded text-slate-600 hover:bg-white flex items-center justify-center text-[10px]"
+                                >
+                                    <i class="ph-bold ph-minus"></i>
+                                </button>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    :value="stocks[{{ $buku->id }}]"
+                                    @change="saveBookStock({{ $buku->id }}, $event.target.value)"
+                                    class="w-10 h-6 text-center text-xs font-extrabold text-emerald-700 bg-white rounded border-x border-slate-200 outline-none"
+                                >
+                                <button
+                                    type="button"
+                                    @click="saveBookStock({{ $buku->id }}, (stocks[{{ $buku->id }}] || 0) + 1)"
+                                    class="w-6 h-6 rounded text-slate-600 hover:bg-white flex items-center justify-center text-[10px]"
+                                >
+                                    <i class="ph-bold ph-plus"></i>
+                                </button>
+                            </div>
 
                             <div class="inline-flex items-center gap-1.5">
                                 <a 
@@ -171,7 +385,7 @@
 
                                 <button 
                                     type="button" 
-                                    @click="openSingleDelete('{{ route('pustakawan.buku.destroy', $buku) }}', {{ Js::from($buku->judul) }})"
+                                    @click="openSingleDelete({{ $buku->id }}, '{{ route('pustakawan.buku.destroy', $buku) }}', {{ Js::from($buku->judul) }})"
                                     class="w-7 h-7 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"
                                     title="Hapus Buku"
                                 >
@@ -202,9 +416,9 @@
                                 title="Pilih Semua di Halaman Ini"
                             >
                         </th>
-                        <th class="py-4 px-6">Buku</th>
+                        <th class="py-4 px-6">Buku &amp; Tanggal Terbit</th>
                         <th class="py-4 px-6">Kategori</th>
-                        <th class="py-4 px-6">Stok</th>
+                        <th class="py-4 px-6">Stok (Ketik / Klik)</th>
                         <th class="py-4 px-6">ISBN</th>
                         <th class="py-4 px-6 text-right">Aksi</th>
                     </tr>
@@ -212,6 +426,8 @@
                 <tbody class="divide-y divide-slate-100 text-sm">
                     @forelse($bukus as $buku)
                         <tr 
+                            x-show="!isDeleted({{ $buku->id }})"
+                            x-transition
                             class="hover:bg-slate-50/60 transition-colors group"
                             :class="isSelected({{ $buku->id }}) ? 'bg-blue-50/50' : ''"
                         >
@@ -225,7 +441,7 @@
                                 >
                             </td>
                             
-                            <!-- Kolom Buku: Thumbnail + Judul + Penulis • Tahun -->
+                            <!-- Kolom Buku: Thumbnail + Judul + Penulis • Tanggal Terbit -->
                             <td class="py-4 px-6">
                                 <div class="flex items-center gap-3.5">
                                     <div class="w-11 h-15 rounded-lg overflow-hidden bg-slate-100 shrink-0 shadow-sm border border-slate-200/60 aspect-[3/4.2]">
@@ -236,26 +452,50 @@
                                             {{ $buku->judul }}
                                         </h4>
                                         <p class="text-xs text-slate-500 mt-0.5">
-                                            {{ $buku->pengarang }} &bull; {{ $buku->tahun_terbit }}
+                                            {{ $buku->pengarang }} &bull; <span class="text-slate-600 font-medium">{{ $buku->tanggal_terbit_formatted }}</span>
                                         </p>
                                     </div>
                                 </div>
                             </td>
 
-                            <!-- Kolom Kategori: Badge Lembut Biru/Ungu -->
+                            <!-- Kolom Kategori -->
                             <td class="py-4 px-6">
                                 <span class="inline-block px-3 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-600 border border-blue-100">
                                     {{ $buku->kategori->nama_kategori ?? 'Umum' }}
                                 </span>
                             </td>
 
-                            <!-- Kolom Stok: Angka Hijau + Teks Tersedia -->
+                            <!-- Kolom Stok: Dapat Diketik Langsung + Stepper -->
                             <td class="py-4 px-6">
-                                <div>
-                                    <span class="font-bold text-emerald-600 text-base leading-none block">
-                                        {{ $buku->stok }}
-                                    </span>
-                                    <span class="text-xs text-slate-500 font-medium">Tersedia</span>
+                                <div class="inline-flex items-center rounded-xl border border-slate-200 bg-white p-0.5 shadow-2xs">
+                                    <button
+                                        type="button"
+                                        @click="saveBookStock({{ $buku->id }}, (stocks[{{ $buku->id }}] || 0) - 1)"
+                                        :disabled="stockSavingId === {{ $buku->id }}"
+                                        class="w-7 h-7 rounded-lg text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors"
+                                        title="Kurangi Stok"
+                                    >
+                                        <i class="ph-bold ph-minus text-xs"></i>
+                                    </button>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="9999"
+                                        :value="stocks[{{ $buku->id }}]"
+                                        @change="saveBookStock({{ $buku->id }}, $event.target.value)"
+                                        @keydown.enter.prevent="$event.target.blur()"
+                                        title="Ketik langsung jumlah stok lalu tekan Enter"
+                                        class="w-12 h-7 text-center text-xs font-extrabold text-emerald-700 bg-transparent border-x border-slate-100 outline-none focus:bg-emerald-50/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    >
+                                    <button
+                                        type="button"
+                                        @click="saveBookStock({{ $buku->id }}, (stocks[{{ $buku->id }}] || 0) + 1)"
+                                        :disabled="stockSavingId === {{ $buku->id }}"
+                                        class="w-7 h-7 rounded-lg text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors"
+                                        title="Tambah Stok"
+                                    >
+                                        <i class="ph-bold ph-plus text-xs"></i>
+                                    </button>
                                 </div>
                             </td>
 
@@ -279,7 +519,7 @@
 
                                     <button 
                                         type="button" 
-                                        @click="openSingleDelete('{{ route('pustakawan.buku.destroy', $buku) }}', {{ Js::from($buku->judul) }})"
+                                        @click="openSingleDelete({{ $buku->id }}, '{{ route('pustakawan.buku.destroy', $buku) }}', {{ Js::from($buku->judul) }})"
                                         class="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                                         title="Hapus Buku"
                                     >
@@ -311,14 +551,12 @@
             </div>
 
             <div class="flex items-center gap-1.5">
-                {{-- Tombol Prev --}}
                 @if ($bukus->onFirstPage())
                     <span class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-300 cursor-not-allowed">Prev</span>
                 @else
                     <a href="{{ $bukus->previousPageUrl() }}" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-colors">Prev</a>
                 @endif
 
-                {{-- Nomor Halaman Aktif & Terdekat --}}
                 @foreach ($bukus->getUrlRange(max(1, $bukus->currentPage() - 2), min($bukus->lastPage(), $bukus->currentPage() + 2)) as $page => $url)
                     @if ($page == $bukus->currentPage())
                         <span class="w-8 h-8 rounded-lg bg-[#2563EB] text-white font-bold flex items-center justify-center shadow-sm">
@@ -331,7 +569,6 @@
                     @endif
                 @endforeach
 
-                {{-- Tombol Next --}}
                 @if ($bukus->hasMorePages())
                     <a href="{{ $bukus->nextPageUrl() }}" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-blue-600 transition-colors">Next</a>
                 @else
@@ -350,7 +587,7 @@
     >
         <div 
             @click.away="openCreateModal = false"
-            class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden transform transition-all"
+            class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden transform transition-all"
         >
             <!-- Header Modal -->
             <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4 shrink-0 bg-white">
@@ -360,7 +597,7 @@
                     </div>
                     <div>
                         <h3 class="text-base font-bold text-slate-900 leading-tight">Tambah Buku Baru</h3>
-                        <p class="text-xs text-slate-500">Lengkapi informasi buku untuk ditambahkan ke katalog.</p>
+                        <p class="text-xs text-slate-500">Lengkapi informasi buku beserta tanggal terbit &amp; kategori koleksi.</p>
                     </div>
                 </div>
                 <button type="button" @click="openCreateModal = false" class="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-lg transition-colors">
@@ -375,6 +612,103 @@
                 enctype="multipart/form-data" 
                 class="flex flex-col flex-1 overflow-hidden"
                 x-data="{ 
+                    pubDay: {{ (int) date('j') }},
+                    pubMonth: {{ (int) date('n') }},
+                    pubYear: {{ (int) date('Y') }},
+                    bookDate: '{{ date('Y-m-d') }}',
+                    bookStock: 5,
+                    selectedKategoriId: @js($kategoris->first()?->id ?? ''),
+                    kategoriSearch: '',
+                    kategoriList: @js($kategoriListJson),
+                    showAddKategori: false,
+                    newKategoriName: '',
+                    addingKategori: false,
+                    kategoriError: '',
+                    monthNames: ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'],
+                    syncDateFromParts() {
+                        let y = parseInt(this.pubYear, 10);
+                        if (isNaN(y) || y < 1900) y = 1900;
+                        if (y > {{ date('Y') + 1 }}) y = {{ date('Y') + 1 }};
+                        let m = parseInt(this.pubMonth, 10);
+                        if (isNaN(m) || m < 1) m = 1;
+                        if (m > 12) m = 12;
+                        const maxD = new Date(y, m, 0).getDate();
+                        let d = parseInt(this.pubDay, 10);
+                        if (isNaN(d) || d < 1) d = 1;
+                        if (d > maxD) d = maxD;
+                        this.pubDay = d;
+                        this.pubMonth = m;
+                        this.bookDate = `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    },
+                    syncPartsFromDate() {
+                        if (!this.bookDate) return;
+                        const parts = this.bookDate.split('-');
+                        if (parts.length === 3) {
+                            this.pubYear = parseInt(parts[0], 10) || {{ date('Y') }};
+                            this.pubMonth = parseInt(parts[1], 10) || 1;
+                            this.pubDay = parseInt(parts[2], 10) || 1;
+                        }
+                    },
+                    get formattedPubDate() {
+                        const mName = this.monthNames[(this.pubMonth || 1) - 1] || 'Januari';
+                        return `${String(this.pubDay || 1).padStart(2, '0')} ${mName} ${this.pubYear || '{{ date('Y') }}'}`;
+                    },
+                    get filteredKategoris() {
+                        const q = (this.kategoriSearch || '').toLowerCase().trim();
+                        if (!q) return this.kategoriList;
+                        return this.kategoriList.filter(k => k.nama_kategori.toLowerCase().includes(q));
+                    },
+                    get selectedKategoriName() {
+                        const found = this.kategoriList.find(k => String(k.id) === String(this.selectedKategoriId));
+                        return found ? found.nama_kategori : 'Belum dipilih';
+                    },
+                    categoryIcon(name) {
+                        const n = (name || '').toLowerCase();
+                        if (n.includes('komputer') || n.includes('teknologi') || n.includes('informatika') || n.includes('rpl')) return 'ph-desktop-tower';
+                        if (n.includes('agama') || n.includes('islam')) return 'ph-mosque';
+                        if (n.includes('bahasa') || n.includes('inggris') || n.includes('indonesia')) return 'ph-translate';
+                        if (n.includes('sains') || n.includes('ipa') || n.includes('matematika') || n.includes('fisika') || n.includes('kimia')) return 'ph-atom';
+                        if (n.includes('ekonomi') || n.includes('bisnis') || n.includes('akuntansi') || n.includes('manajemen')) return 'ph-chart-line-up';
+                        if (n.includes('sejarah') || n.includes('geografi') || n.includes('ips')) return 'ph-globe-hemisphere-east';
+                        if (n.includes('seni') || n.includes('desain') || n.includes('kriya') || n.includes('musik') || n.includes('olahraga')) return 'ph-paint-brush-broad';
+                        if (n.includes('fiksi') || n.includes('novel') || n.includes('sastra') || n.includes('cerita') || n.includes('komik')) return 'ph-sparkle';
+                        if (n.includes('psikologi') || n.includes('filsafat') || n.includes('pengembangan')) return 'ph-brain';
+                        if (n.includes('resep') || n.includes('kuliner') || n.includes('boga')) return 'ph-cooking-pot';
+                        if (n.includes('hukum') || n.includes('sosial') || n.includes('ppkn') || n.includes('pancasila')) return 'ph-scales';
+                        if (n.includes('mesin') || n.includes('otomotif') || n.includes('elektro') || n.includes('teknik') || n.includes('bangunan')) return 'ph-wrench';
+                        return 'ph-books';
+                    },
+                    async createQuickKategori() {
+                        const name = (this.newKategoriName || '').trim();
+                        if (!name || this.addingKategori) return;
+                        this.addingKategori = true;
+                        this.kategoriError = '';
+                        try {
+                            const res = await fetch('{{ route('pustakawan.kategori.quick') }}', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content || '{{ csrf_token() }}'
+                                },
+                                body: JSON.stringify({ nama_kategori: name })
+                            });
+                            const data = await res.json();
+                            if (res.ok && data.success && data.kategori) {
+                                this.kategoriList.push(data.kategori);
+                                this.selectedKategoriId = data.kategori.id;
+                                this.newKategoriName = '';
+                                this.showAddKategori = false;
+                            } else {
+                                const firstErr = data.errors ? Object.values(data.errors)[0][0] : null;
+                                this.kategoriError = firstErr || data.message || 'Gagal menambah kategori.';
+                            }
+                        } catch (e) {
+                            this.kategoriError = 'Gagal menghubungi server.';
+                        } finally {
+                            this.addingKategori = false;
+                        }
+                    },
                     imageMode: 'upload', 
                     useExtraImages: false,
                     previewFront: '', 
@@ -402,6 +736,11 @@
             >
                 @csrf
                 <input type="hidden" name="use_extra_images" :value="useExtraImages ? '1' : '0'">
+                <input type="hidden" name="tahun_terbit" :value="pubYear">
+                <input type="hidden" name="tgl_hari" :value="pubDay">
+                <input type="hidden" name="tgl_bulan" :value="pubMonth">
+                <input type="hidden" name="tgl_tahun" :value="pubYear">
+                <input type="hidden" name="kategori_id" :value="selectedKategoriId">
 
                 <div class="p-6 overflow-y-auto space-y-4 flex-1">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -423,33 +762,106 @@
                             <input type="text" name="penerbit" required placeholder="Contoh: Bentang Pustaka" class="w-full rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all">
                         </div>
 
-                        <!-- Tahun Terbit -->
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Tahun Terbit <span class="text-rose-500">*</span></label>
-                            <input type="number" name="tahun_terbit" required min="1900" max="{{ date('Y') + 1 }}" value="{{ date('Y') }}" class="w-full rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all">
+                        <!-- Tanggal Terbit Lengkap (Tanggal, Bulan, Tahun) -->
+                        <div class="sm:col-span-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2.5">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <label class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                    <i class="ph-bold ph-calendar-blank text-blue-600"></i>
+                                    <span>Tanggal Terbit (Tanggal, Bulan, Tahun) <span class="text-rose-500">*</span></span>
+                                </label>
+                                <span class="px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-bold" x-text="formattedPubDate"></span>
+                            </div>
+
+                            <div class="grid grid-cols-12 gap-2 items-center">
+                                <div class="col-span-3 sm:col-span-2">
+                                    <span class="block text-[10px] font-bold text-slate-500 mb-1">Tanggal</span>
+                                    <input type="number" min="1" max="31" x-model.number="pubDay" @input="syncDateFromParts()" class="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-center text-slate-900 outline-none focus:border-blue-500">
+                                </div>
+                                <div class="col-span-5 sm:col-span-4">
+                                    <span class="block text-[10px] font-bold text-slate-500 mb-1">Bulan</span>
+                                    <select x-model.number="pubMonth" @change="syncDateFromParts()" class="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-900 outline-none focus:border-blue-500">
+                                        <template x-for="(mName, idx) in monthNames" :key="idx">
+                                            <option :value="idx + 1" :selected="pubMonth === (idx + 1)" x-text="(idx + 1) + ' - ' + mName"></option>
+                                        </template>
+                                    </select>
+                                </div>
+                                <div class="col-span-4 sm:col-span-3">
+                                    <span class="block text-[10px] font-bold text-slate-500 mb-1">Tahun</span>
+                                    <input type="number" min="1900" max="{{ date('Y') + 1 }}" x-model.number="pubYear" @input="syncDateFromParts()" class="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-center text-slate-900 outline-none focus:border-blue-500">
+                                </div>
+                                <div class="col-span-12 sm:col-span-3">
+                                    <span class="block text-[10px] font-bold text-slate-500 mb-1">Kalender</span>
+                                    <input type="date" name="tanggal_terbit" x-model="bookDate" @change="syncPartsFromDate()" required class="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-800 outline-none focus:border-blue-500">
+                                </div>
+                            </div>
                         </div>
 
                         <!-- ISBN -->
                         <div>
                             <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">ISBN <span class="text-rose-500">*</span></label>
-                            <input type="text" name="isbn" required placeholder="Contoh: 9786022916964" class="w-full rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all">
+                            <input type="text" name="isbn" required placeholder="Contoh: 9786022916964" class="w-full rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all font-mono">
                         </div>
 
-                        <!-- Kategori -->
+                        <!-- Stok (Typable + Stepper) -->
                         <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Kategori <span class="text-rose-500">*</span></label>
-                            <select name="kategori_id" required class="w-full rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all">
-                                <option value="">-- Pilih Kategori --</option>
-                                @foreach($kategoris as $kategori)
-                                    <option value="{{ $kategori->id }}">{{ $kategori->nama_kategori }}</option>
-                                @endforeach
-                            </select>
+                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Jumlah Stok (Ketik / Klik) <span class="text-rose-500">*</span></label>
+                            <div class="flex items-center gap-1.5">
+                                <div class="flex-1 flex items-center rounded-xl border border-slate-200 bg-white p-0.5">
+                                    <button type="button" @click="bookStock = Math.max(0, (parseInt(bookStock, 10) || 0) - 1)" class="w-9 h-9 rounded-lg text-slate-600 hover:bg-slate-100 flex items-center justify-center">
+                                        <i class="ph-bold ph-minus text-xs"></i>
+                                    </button>
+                                    <input type="number" name="stok" x-model.number="bookStock" required min="0" class="w-full text-center font-extrabold text-sm text-slate-900 bg-transparent outline-none px-2 py-1.5">
+                                    <button type="button" @click="bookStock = (parseInt(bookStock, 10) || 0) + 1" class="w-9 h-9 rounded-lg text-slate-600 hover:bg-slate-100 flex items-center justify-center">
+                                        <i class="ph-bold ph-plus text-xs"></i>
+                                    </button>
+                                </div>
+                                <button type="button" @click="bookStock = (parseInt(bookStock, 10) || 0) + 5" class="px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-xs font-extrabold text-slate-600">+5</button>
+                            </div>
                         </div>
 
-                        <!-- Stok -->
-                        <div>
-                            <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">Jumlah Stok <span class="text-rose-500">*</span></label>
-                            <input type="number" name="stok" required min="0" value="5" class="w-full rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 outline-none transition-all">
+                        <!-- Pilihan Kategori Visual Interaktif -->
+                        <div class="sm:col-span-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2.5">
+                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                    <label class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                        <i class="ph-bold ph-squares-four text-blue-600"></i>
+                                        <span>Pilih Kategori Koleksi <span class="text-rose-500">*</span></span>
+                                    </label>
+                                    <p class="text-[11px] text-slate-500">Terpilih: <strong class="text-blue-600" x-text="selectedKategoriName"></strong></p>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <input type="text" x-model="kategoriSearch" placeholder="Cari kategori..." class="w-32 sm:w-40 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-blue-500">
+                                    <button type="button" @click="showAddKategori = !showAddKategori" class="px-2.5 py-1.5 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold">
+                                        + Baru
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div x-show="showAddKategori" x-transition class="p-2.5 rounded-xl bg-white border border-blue-200 flex items-center gap-2">
+                                <input type="text" x-model="newKategoriName" @keydown.enter.prevent="createQuickKategori()" placeholder="Nama kategori baru..." class="flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs outline-none focus:border-blue-500">
+                                <button type="button" @click="createQuickKategori()" :disabled="addingKategori" class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold">Simpan</button>
+                            </div>
+
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-44 overflow-y-auto pr-1">
+                                <template x-for="kat in filteredKategoris" :key="kat.id">
+                                    <button
+                                        type="button"
+                                        @click="selectedKategoriId = kat.id"
+                                        :class="String(selectedKategoriId) === String(kat.id)
+                                            ? 'border-blue-600 bg-blue-600 text-white shadow-xs'
+                                            : 'border-slate-200 bg-white hover:border-blue-300 text-slate-700'"
+                                        class="flex items-center gap-2 p-2 rounded-xl border text-left transition-all"
+                                    >
+                                        <div
+                                            :class="String(selectedKategoriId) === String(kat.id) ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'"
+                                            class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                                        >
+                                            <i class="ph-bold text-sm" :class="categoryIcon(kat.nama_kategori)"></i>
+                                        </div>
+                                        <span class="text-xs font-bold line-clamp-1 flex-1" x-text="kat.nama_kategori"></span>
+                                    </button>
+                                </template>
+                            </div>
                         </div>
 
                         <!-- Gambar buku -->
@@ -523,97 +935,6 @@
                                             placeholder="https://... tempel link URL sampul depan" 
                                             class="w-full rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white px-3.5 py-2 text-xs text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                                         >
-                                        <p class="text-[10px] text-slate-400">Masukkan URL gambar langsung (contoh: https://.../cover.jpg).</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Opsi ON/OFF Gambar Samping & Belakang -->
-                            <div class="pt-1 flex items-center justify-between gap-3">
-                                <div class="flex items-center gap-2.5">
-                                    <div class="w-7 h-7 rounded-lg flex items-center justify-center transition-colors" :class="useExtraImages ? 'bg-blue-100 text-blue-600' : 'bg-slate-200/70 text-slate-500'">
-                                        <i class="ph-bold ph-images text-sm"></i>
-                                    </div>
-                                    <div>
-                                        <p class="text-xs font-bold text-slate-800">Tambahkan Gambar Samping & Belakang</p>
-                                    </div>
-                                </div>
-                                <button 
-                                    type="button" 
-                                    @click="useExtraImages = !useExtraImages"
-                                    :class="useExtraImages ? 'bg-[#2563EB]' : 'bg-slate-300'"
-                                    class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
-                                    role="switch"
-                                    :aria-checked="useExtraImages"
-                                >
-                                    <span 
-                                        :class="useExtraImages ? 'translate-x-5' : 'translate-x-0'"
-                                        class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out"
-                                    ></span>
-                                </button>
-                            </div>
-
-                            <!-- 2. Samping & 3. Belakang (Muncul saat ON) -->
-                            <div x-show="useExtraImages" x-transition class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <!-- 2. Samping -->
-                                <div class="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-3">
-                                    <div class="w-16 h-20 shrink-0 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex flex-col items-center justify-center">
-                                        <template x-if="previewSide">
-                                            <img :src="previewSide" alt="Samping" class="w-full h-full object-cover">
-                                        </template>
-                                        <template x-if="!previewSide">
-                                            <div class="text-center p-1 text-slate-400">
-                                                <i class="ph ph-book-bookmark text-base block"></i>
-                                                <span class="text-[9px] font-medium block">Samping</span>
-                                            </div>
-                                        </template>
-                                    </div>
-                                    <div class="flex-1 min-w-0 space-y-1.5">
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-xs font-bold text-slate-800">2. Sampul Samping</span>
-                                            <span class="text-[10px] text-slate-400 font-medium">Opsional</span>
-                                        </div>
-                                        <div x-show="imageMode === 'upload'">
-                                            <label class="flex items-center justify-center gap-1.5 w-full py-2 px-2.5 border border-dashed border-slate-300 rounded-lg cursor-pointer bg-slate-50 hover:bg-blue-50/40 hover:border-blue-400 transition-all text-center">
-                                                <i class="ph-bold ph-upload-simple text-blue-600 text-xs"></i>
-                                                <span class="text-[11px] font-semibold text-slate-700 truncate" x-text="sideName || 'Pilih Gambar'"></span>
-                                                <input type="file" name="side_file" accept="image/*" class="hidden" @change="handleFile('side', $event)">
-                                            </label>
-                                        </div>
-                                        <div x-show="imageMode === 'url'">
-                                            <input type="url" name="side_image" x-model="previewSide" placeholder="https://... URL samping" class="w-full rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white px-2.5 py-1.5 text-xs outline-none focus:border-blue-500">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- 3. Belakang -->
-                                <div class="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-3">
-                                    <div class="w-16 h-20 shrink-0 rounded-lg border border-slate-200 bg-slate-50 overflow-hidden flex flex-col items-center justify-center">
-                                        <template x-if="previewBack">
-                                            <img :src="previewBack" alt="Belakang" class="w-full h-full object-cover">
-                                        </template>
-                                        <template x-if="!previewBack">
-                                            <div class="text-center p-1 text-slate-400">
-                                                <i class="ph ph-book text-base block"></i>
-                                                <span class="text-[9px] font-medium block">Belakang</span>
-                                            </div>
-                                        </template>
-                                    </div>
-                                    <div class="flex-1 min-w-0 space-y-1.5">
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-xs font-bold text-slate-800">3. Sampul Belakang</span>
-                                            <span class="text-[10px] text-slate-400 font-medium">Opsional</span>
-                                        </div>
-                                        <div x-show="imageMode === 'upload'">
-                                            <label class="flex items-center justify-center gap-1.5 w-full py-2 px-2.5 border border-dashed border-slate-300 rounded-lg cursor-pointer bg-slate-50 hover:bg-blue-50/40 hover:border-blue-400 transition-all text-center">
-                                                <i class="ph-bold ph-upload-simple text-blue-600 text-xs"></i>
-                                                <span class="text-[11px] font-semibold text-slate-700 truncate" x-text="backName || 'Pilih Gambar'"></span>
-                                                <input type="file" name="back_file" accept="image/*" class="hidden" @change="handleFile('back', $event)">
-                                            </label>
-                                        </div>
-                                        <div x-show="imageMode === 'url'">
-                                            <input type="url" name="back_image" x-model="previewBack" placeholder="https://... URL belakang" class="w-full rounded-lg border border-slate-200 bg-slate-50/50 focus:bg-white px-2.5 py-1.5 text-xs outline-none focus:border-blue-500">
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -640,7 +961,7 @@
         </div>
     </div>
 
-    <!-- Modal Pop-up Konfirmasi Hapus Buku (Satuan & Pilih Banyak) -->
+    <!-- Modal Pop-up Konfirmasi Hapus Buku (Satuan & Pilih Banyak - Smooth AJAX) -->
     <div 
         x-show="deleteModalOpen" 
         x-cloak 
@@ -676,52 +997,25 @@
                 </template>
             </div>
 
-            <!-- Form Hapus Satuan -->
-            <template x-if="deleteMode === 'single'">
-                <form :action="deleteTargetUrl" method="POST" class="pt-2 flex items-center gap-2.5">
-                    @csrf
-                    @method('DELETE')
-                    <button 
-                        type="button" 
-                        @click="deleteModalOpen = false"
-                        class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm transition-colors"
-                    >
-                        Batal
-                    </button>
-                    <button 
-                        type="submit"
-                        class="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-rose-500/20 transition-all inline-flex items-center justify-center gap-1.5"
-                    >
-                        <i class="ph-bold ph-trash text-sm"></i>
-                        <span>Ya, Hapus</span>
-                    </button>
-                </form>
-            </template>
-
-            <!-- Form Hapus Banyak (Bulk) -->
-            <template x-if="deleteMode === 'bulk'">
-                <form action="{{ route('pustakawan.buku.bulk-destroy') }}" method="POST" class="pt-2 flex items-center gap-2.5">
-                    @csrf
-                    @method('DELETE')
-                    <template x-for="id in selectedIds" :key="'del-' + id">
-                        <input type="hidden" name="ids[]" :value="id">
-                    </template>
-                    <button 
-                        type="button" 
-                        @click="deleteModalOpen = false"
-                        class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm transition-colors"
-                    >
-                        Batal
-                    </button>
-                    <button 
-                        type="submit"
-                        class="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-rose-500/20 transition-all inline-flex items-center justify-center gap-1.5"
-                    >
-                        <i class="ph-bold ph-trash text-sm"></i>
-                        <span>Hapus (<span x-text="selectedIds.length"></span> Buku)</span>
-                    </button>
-                </form>
-            </template>
+            <div class="pt-2 flex items-center gap-2.5">
+                <button 
+                    type="button" 
+                    @click="deleteModalOpen = false"
+                    :disabled="deleteSubmitting"
+                    class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm transition-colors"
+                >
+                    Batal
+                </button>
+                <button 
+                    type="button"
+                    @click="confirmDeleteAction()"
+                    :disabled="deleteSubmitting"
+                    class="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-rose-500/20 transition-all inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
+                >
+                    <i class="ph-bold text-sm" :class="deleteSubmitting ? 'ph-spinner animate-spin' : 'ph-trash'"></i>
+                    <span x-text="deleteSubmitting ? 'Menghapus...' : (deleteMode === 'bulk' ? 'Hapus (' + selectedIds.length + ' Buku)' : 'Ya, Hapus')"></span>
+                </button>
+            </div>
         </div>
     </div>
 

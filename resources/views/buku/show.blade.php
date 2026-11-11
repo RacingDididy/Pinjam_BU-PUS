@@ -17,11 +17,50 @@
         selectedRating: 5,
         ratingHover: 5,
         commentText: '',
+        commentSubmitting: false,
+        newComments: [],
+        totalCommentsCount: {{ $buku->ratings->count() }},
         isFavorite: {{ $isFavorite ? 'true' : 'false' }},
         favoriteLoading: false,
         hasLoan: {{ $hasActiveLoan ? 'true' : 'false' }},
         liveStok: {{ (int) $buku->stok }},
         borrowBusy: false,
+        async submitComment() {
+            if (this.commentSubmitting || this.commentText.trim().length === 0) return;
+            this.commentSubmitting = true;
+            try {
+                const res = await fetch('{{ route('buku.rating', $buku->id) }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                    },
+                    body: JSON.stringify({
+                        bintang: this.selectedRating,
+                        ulasan: this.commentText
+                    })
+                });
+                const data = await res.json();
+                if (res.status === 401 || data.auth_required) {
+                    this.openAuthModal('{{ __('Komentar') }}');
+                    return;
+                }
+                if (res.ok && data.success && data.rating) {
+                    this.newComments.unshift(data.rating);
+                    this.totalCommentsCount++;
+                    this.commentText = '';
+                    $dispatch('notify-toast', { message: data.message, type: 'success' });
+                } else {
+                    const firstErr = data.errors ? Object.values(data.errors)[0][0] : null;
+                    $dispatch('notify-toast', { message: firstErr || data.message || 'Gagal mengirim komentar.', type: 'error' });
+                }
+            } catch (e) {
+                $dispatch('notify-toast', { message: 'Terjadi gangguan jaringan saat mengirim komentar.', type: 'error' });
+            } finally {
+                this.commentSubmitting = false;
+            }
+        },
         async submitDirectBorrow() {
             if (this.borrowBusy || this.liveStok <= 0) return;
             this.borrowBusy = true;
@@ -143,6 +182,7 @@
                         width="380"
                         height="532"
                         fetchpriority="high"
+                        onerror="this.onerror=null;this.src='https://placehold.co/400x600/1e293b/ffffff?text={{ urlencode($buku->judul) }}';"
                         class="w-full h-full object-cover transition-all duration-300"
                     >
                     <div x-show="previews.length > 1" class="absolute bottom-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none">
@@ -326,11 +366,11 @@
                             <span>{{ __('Tambah Keranjang') }}</span>
                         </button>
 
-                        <!-- When in cart: show [- qty +] stepper -->
+                        <!-- When in cart: show [- qty +] typable stepper -->
                         <div 
                             x-cloak
                             x-show="cartQty({{ $buku->id }}) > 0"
-                            class="min-h-[44px] px-2 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs sm:text-sm inline-flex items-center justify-between gap-2 flex-1 sm:flex-none"
+                            class="min-h-[44px] px-2 py-1.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold text-xs sm:text-sm inline-flex items-center justify-between gap-1.5 flex-1 sm:flex-none"
                         >
                             <button 
                                 type="button"
@@ -341,14 +381,25 @@
                             >
                                 <i class="ph-bold ph-minus text-xs" aria-hidden="true"></i>
                             </button>
-                            <button 
-                                type="button"
-                                @click="cartOpen = true"
-                                class="px-1.5 text-xs sm:text-sm font-extrabold inline-flex items-center gap-1.5"
-                            >
-                                <i class="ph-bold ph-shopping-cart text-sm" aria-hidden="true"></i>
-                                <span><span x-text="cartQty({{ $buku->id }})"></span> {{ __('Buku') }}</span>
-                            </button>
+                            <div class="inline-flex items-center gap-1 px-1">
+                                <input
+                                    type="number"
+                                    min="1"
+                                    :max="liveStok"
+                                    :value="cartQty({{ $buku->id }})"
+                                    @change="updateCartQty({{ $buku->id }}, 'set', $event.target.value)"
+                                    @keydown.enter.prevent="$event.target.blur()"
+                                    aria-label="Ketik jumlah buku"
+                                    class="w-12 h-8 text-center text-xs sm:text-sm font-extrabold rounded-lg bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 outline-none focus:border-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                >
+                                <button
+                                    type="button"
+                                    @click="cartOpen = true"
+                                    class="text-xs font-extrabold hover:underline hidden sm:inline"
+                                >
+                                    {{ __('Buku') }}
+                                </button>
+                            </div>
                             <button 
                                 type="button"
                                 @click="updateCartQty({{ $buku->id }}, 'increment')"
@@ -449,8 +500,8 @@
 
                         <div class="divide-y divide-slate-200 dark:divide-slate-800">
                             <div class="p-3 sm:p-3.5">
-                                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-0.5">{{ __('TAHUN TERBIT') }}</span>
-                                <span class="font-bold text-slate-800 dark:text-slate-100 text-xs sm:text-sm block">{{ $buku->tahun_terbit ?: '-' }}</span>
+                                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-0.5">{{ __('TANGGAL TERBIT') }}</span>
+                                <span class="font-bold text-slate-800 dark:text-slate-100 text-xs sm:text-sm block">{{ $buku->tanggal_terbit_formatted }}</span>
                             </div>
                             <div class="p-3 sm:p-3.5">
                                 <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-0.5">{{ __('ISBN') }}</span>
@@ -479,7 +530,7 @@
                     {{ __('Diskusi & penilaian tentang') }} "{{ $buku->judul }}"
                 </p>
             </div>
-            <span class="min-w-[32px] h-7 px-2.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-extrabold inline-flex items-center justify-center">
+            <span class="min-w-[32px] h-7 px-2.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-extrabold inline-flex items-center justify-center" x-text="totalCommentsCount">
                 {{ $buku->ratings->count() }}
             </span>
         </div>
@@ -510,7 +561,7 @@
                         </div>
                     </div>
 
-                    <form action="{{ route('buku.rating', $buku->id) }}" method="POST" class="space-y-3">
+                    <form action="{{ route('buku.rating', $buku->id) }}" method="POST" @submit.prevent="submitComment()" class="space-y-3">
                         @csrf
                         <input type="hidden" name="bintang" :value="selectedRating">
 
@@ -556,11 +607,11 @@
 
                         <button 
                             type="submit"
-                            :disabled="commentText.trim().length === 0"
+                            :disabled="commentSubmitting || commentText.trim().length === 0"
                             class="w-full min-h-[44px] rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400/70 dark:disabled:bg-blue-800/50 text-white font-bold text-xs sm:text-sm py-2.5 flex items-center justify-center gap-2 transition-colors"
                         >
-                            <i class="ph-bold ph-paper-plane-tilt text-sm" aria-hidden="true"></i>
-                            <span>{{ __('Kirim komentar') }}</span>
+                            <i class="ph-bold text-sm" :class="commentSubmitting ? 'ph-spinner animate-spin' : 'ph-paper-plane-tilt'" aria-hidden="true"></i>
+                            <span x-text="commentSubmitting ? 'Mengirim...' : '{{ __('Kirim komentar') }}'"></span>
                         </button>
                     </form>
                 @else
@@ -617,63 +668,90 @@
                     {{ __('Komentar terbaru') }}
                 </h3>
 
-                @if($buku->ratings->isEmpty())
-                    <div class="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/30 py-14 px-6 text-center space-y-1.5">
-                        <div class="w-11 h-11 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-2 text-xl">
-                            <i class="ph ph-chat-circle" aria-hidden="true"></i>
-                        </div>
-                        <p class="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-200">
-                            {{ __('Belum ada komentar') }}
-                        </p>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
-                            {{ __('Jadilah pembaca pertama yang membuka diskusi positif.') }}
-                        </p>
+                <div x-show="totalCommentsCount === 0" class="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-950/30 py-14 px-6 text-center space-y-1.5">
+                    <div class="w-11 h-11 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto mb-2 text-xl">
+                        <i class="ph ph-chat-circle" aria-hidden="true"></i>
                     </div>
-                @else
-                    <div class="space-y-3 max-h-[460px] overflow-y-auto pr-1">
-                        @foreach($buku->ratings as $ulasan)
-                            @php
-                                $rUser = $ulasan->user;
-                                $rPalette = $rUser ? $rUser->color_palette : ['bg' => '#dbeafe', 'text' => '#1d4ed8'];
-                                $rInitial = $rUser ? $rUser->initial : mb_strtoupper(mb_substr(trim($ulasan->nama_penilai ?: 'P'), 0, 1));
-                            @endphp
-                            <article class="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2">
-                                <div class="flex items-center justify-between gap-2">
-                                    <div class="flex items-center gap-2.5 min-w-0">
-                                        @if($rUser && $rUser->avatar_url)
-                                            <img src="{{ $rUser->avatar_url }}" alt="{{ $ulasan->nama_penilai }}" width="34" height="34" class="w-8 h-8 rounded-full object-cover shrink-0">
-                                        @else
-                                            <span 
-                                                class="w-8 h-8 rounded-full text-xs font-extrabold flex items-center justify-center shrink-0"
-                                                style="background-color: {{ $rPalette['bg'] }}; color: {{ $rPalette['text'] }};"
-                                            >
-                                                {{ $rInitial }}
-                                            </span>
-                                        @endif
-                                        <div class="min-w-0">
-                                            <h4 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
-                                                {{ $rUser?->name ?? $ulasan->nama_penilai }}
-                                            </h4>
-                                            <span class="text-[10px] text-slate-400 block">{{ $ulasan->created_at->diffForHumans() }}</span>
-                                        </div>
-                                    </div>
+                    <p class="text-xs sm:text-sm font-extrabold text-slate-800 dark:text-slate-200">
+                        {{ __('Belum ada komentar') }}
+                    </p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
+                        {{ __('Jadilah pembaca pertama yang membuka diskusi positif.') }}
+                    </p>
+                </div>
 
-                                    <div class="flex items-center gap-0.5 text-amber-400 text-xs shrink-0">
-                                        @for($s = 1; $s <= 5; $s++)
-                                            <i class="{{ $s <= $ulasan->bintang ? 'ph-fill ph-star' : 'ph ph-star text-slate-300 dark:text-slate-600' }}" aria-hidden="true"></i>
-                                        @endfor
+                <div x-show="totalCommentsCount > 0" class="space-y-3 max-h-[460px] overflow-y-auto pr-1">
+                    <template x-for="item in newComments" :key="'new-' + item.id">
+                        <article class="p-4 rounded-2xl border border-blue-200 dark:border-blue-800/80 bg-blue-50/40 dark:bg-blue-950/20 space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <template x-if="item.avatar_url">
+                                        <img :src="item.avatar_url" :alt="item.nama_penilai" width="34" height="34" class="w-8 h-8 rounded-full object-cover shrink-0">
+                                    </template>
+                                    <template x-if="!item.avatar_url">
+                                        <span 
+                                            class="w-8 h-8 rounded-full text-xs font-extrabold flex items-center justify-center shrink-0"
+                                            :style="`background-color: ${item.palette?.bg || '#dbeafe'}; color: ${item.palette?.text || '#1d4ed8'};`"
+                                            x-text="item.initial || 'P'"
+                                        ></span>
+                                    </template>
+                                    <div class="min-w-0">
+                                        <h4 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate" x-text="item.nama_penilai"></h4>
+                                        <span class="text-[10px] text-blue-600 dark:text-blue-400 font-semibold block" x-text="item.waktu"></span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-0.5 text-amber-400 text-xs shrink-0">
+                                    <template x-for="s in 5" :key="s">
+                                        <i :class="s <= item.bintang ? 'ph-fill ph-star' : 'ph ph-star text-slate-300 dark:text-slate-600'"></i>
+                                    </template>
+                                </div>
+                            </div>
+                            <p class="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed" x-text="item.ulasan"></p>
+                        </article>
+                    </template>
+
+                    @foreach($buku->ratings as $ulasan)
+                        @php
+                            $rUser = $ulasan->user;
+                            $rPalette = $rUser ? $rUser->color_palette : ['bg' => '#dbeafe', 'text' => '#1d4ed8'];
+                            $rInitial = $rUser ? $rUser->initial : mb_strtoupper(mb_substr(trim($ulasan->nama_penilai ?: 'P'), 0, 1));
+                        @endphp
+                        <article class="p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    @if($rUser && $rUser->avatar_url)
+                                        <img src="{{ $rUser->avatar_url }}" alt="{{ $ulasan->nama_penilai }}" width="34" height="34" class="w-8 h-8 rounded-full object-cover shrink-0">
+                                    @else
+                                        <span 
+                                            class="w-8 h-8 rounded-full text-xs font-extrabold flex items-center justify-center shrink-0"
+                                            style="background-color: {{ $rPalette['bg'] }}; color: {{ $rPalette['text'] }};"
+                                        >
+                                            {{ $rInitial }}
+                                        </span>
+                                    @endif
+                                    <div class="min-w-0">
+                                        <h4 class="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
+                                            {{ $rUser?->name ?? $ulasan->nama_penilai }}
+                                        </h4>
+                                        <span class="text-[10px] text-slate-400 block">{{ $ulasan->created_at->diffForHumans() }}</span>
                                     </div>
                                 </div>
 
-                                @if($ulasan->ulasan)
-                                    <p class="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                                        {{ $ulasan->ulasan }}
-                                    </p>
-                                @endif
-                            </article>
-                        @endforeach
-                    </div>
-                @endif
+                                <div class="flex items-center gap-0.5 text-amber-400 text-xs shrink-0">
+                                    @for($s = 1; $s <= 5; $s++)
+                                        <i class="{{ $s <= $ulasan->bintang ? 'ph-fill ph-star' : 'ph ph-star text-slate-300 dark:text-slate-600' }}" aria-hidden="true"></i>
+                                    @endfor
+                                </div>
+                            </div>
+
+                            @if($ulasan->ulasan)
+                                <p class="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                                    {{ $ulasan->ulasan }}
+                                </p>
+                            @endif
+                        </article>
+                    @endforeach
+                </div>
             </div>
 
         </div>

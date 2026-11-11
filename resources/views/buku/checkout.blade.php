@@ -254,7 +254,7 @@
                                         <span>Stok Tersedia (<span x-text="item.stok"></span>)</span>
                                     </span>
 
-                                    <!-- +/- Quantity Stepper -->
+                                    <!-- +/- Quantity Stepper (Typable) -->
                                     <div class="inline-flex items-center rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-0.5 shadow-sm">
                                         <button 
                                             type="button"
@@ -265,7 +265,16 @@
                                         >
                                             <i class="ph-bold ph-minus text-xs" aria-hidden="true"></i>
                                         </button>
-                                        <span class="min-w-[32px] text-center text-xs font-extrabold text-slate-900 dark:text-white select-none" x-text="item.qty"></span>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            :max="item.stok"
+                                            :value="item.qty"
+                                            @change="updateCartQty(item.id, 'set', $event.target.value)"
+                                            @keydown.enter.prevent="$event.target.blur()"
+                                            aria-label="Ketik jumlah buku"
+                                            class="w-12 h-7 text-center text-xs font-extrabold text-slate-900 dark:text-white bg-transparent border-x border-slate-100 dark:border-slate-800 outline-none focus:bg-blue-50/60 dark:focus:bg-blue-950/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        >
                                         <button 
                                             type="button"
                                             @click="updateCartQty(item.id, 'increment')"

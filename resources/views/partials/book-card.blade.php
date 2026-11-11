@@ -46,6 +46,7 @@
                     width="300"
                     height="420"
                     @if($eagerLoadCover) fetchpriority="high" @else loading="lazy" @endif
+                    onerror="this.onerror=null;this.src='https://placehold.co/400x600/1e293b/ffffff?text={{ urlencode($book->judul) }}';"
                     class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                 >
             </a>
@@ -170,7 +171,16 @@
                     >
                         <i class="ph-bold ph-minus text-[10px]" aria-hidden="true"></i>
                     </button>
-                    <span class="text-[11px] sm:text-xs font-extrabold select-none" x-text="cartQty({{ $book->id }})"></span>
+                    <input
+                        type="number"
+                        min="1"
+                        max="{{ (int) $book->stok }}"
+                        :value="cartQty({{ $book->id }})"
+                        @change="updateCartQty({{ $book->id }}, 'set', $event.target.value)"
+                        @keydown.enter.prevent="$event.target.blur()"
+                        aria-label="Ketik jumlah buku"
+                        class="w-9 h-6 text-center text-[11px] sm:text-xs font-extrabold bg-blue-700/60 focus:bg-white focus:text-slate-900 text-white rounded outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    >
                     <button 
                         type="button"
                         @click="updateCartQty({{ $book->id }}, 'increment')"

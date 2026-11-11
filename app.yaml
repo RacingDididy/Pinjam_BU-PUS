@@ -20,5 +20,12 @@ env:
   CACHE_STORE: array
   VIEW_COMPILED_PATH: /tmp
   LOG_CHANNEL: stderr
-  MAIL_MAILER: log
+  MAIL_MAILER: smtp
+  MAIL_HOST: smtp.gmail.com
+  MAIL_PORT: "587"
+  MAIL_USERNAME: albanisetiawan52@gmail.com
+  MAIL_PASSWORD: vlzgamfyykapymjp
+  MAIL_ENCRYPTION: tls
+  MAIL_FROM_ADDRESS: albanisetiawan52@gmail.com
+  MAIL_FROM_NAME: "Perpustakaan SMKN 5 Surakarta"
 app_id: da_RrWI0t5Uj00G

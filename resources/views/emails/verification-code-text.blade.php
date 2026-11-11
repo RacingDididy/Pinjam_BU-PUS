@@ -6,7 +6,9 @@ Halo {{ $user->name ?: $user->email }},
 
 Kami menerima permintaan pendaftaran akun pembaca perpustakaan menggunakan alamat email {{ $user->email }}.
 
-Silakan buka tautan berikut untuk mengonfirmasi alamat email Anda dan melanjutkan pembuatan kata sandi akun:
+KODE VERIFIKASI 6 DIGIT ANDA: {{ $code }}
+
+Atau silakan buka tautan berikut untuk mengonfirmasi alamat email Anda dan melanjutkan pembuatan kata sandi akun:
 
 {{ $verificationUrl }}
 

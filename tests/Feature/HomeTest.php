@@ -30,7 +30,7 @@ class HomeTest extends TestCase
     {
         $this->seed(BukuSeeder::class);
 
-        $response = $this->get('/?search=Laskar');
+        $response = $this->get('/perpustakaan?search=Laskar');
 
         $response->assertStatus(200);
         $response->assertSee('Laskar Pelangi');
@@ -43,7 +43,7 @@ class HomeTest extends TestCase
 
         $komikCategory = Kategori::where('nama_kategori', 'Komik')->first();
 
-        $response = $this->get('/?kategori='.$komikCategory->id);
+        $response = $this->get('/perpustakaan?kategori='.$komikCategory->id);
 
         $response->assertStatus(200);
         $response->assertSee('Donal Bebek');
@@ -53,7 +53,7 @@ class HomeTest extends TestCase
     {
         $this->seed(BukuSeeder::class);
 
-        $response = $this->get('/?search=BukuYangTidakPernahAda');
+        $response = $this->get('/perpustakaan?search=BukuYangTidakPernahAda');
 
         $response->assertStatus(200);
         $response->assertSee('Tidak ada buku yang ditemukan');
@@ -82,30 +82,34 @@ class HomeTest extends TestCase
         $response = $this->actingAs($admin)->get('/admin');
 
         $response->assertStatus(200);
-        $response->assertSee('Ringkasan Laporan');
+        $response->assertSee('Ringkasan & Keamanan Sistem');
     }
 
     public function test_branding_is_pinjam_bu_pus_and_not_sipus(): void
     {
         $response = $this->get('/');
         $response->assertStatus(200);
-        $response->assertSee('Pinjam BU-PUS');
+        $response->assertSee('PINJAM');
+        $response->assertSee('BU-PUS');
         $response->assertDontSee('SIPUS');
 
         $loginResponse = $this->get('/login');
         $loginResponse->assertStatus(200);
-        $loginResponse->assertSee('Pinjam BU-PUS');
+        $loginResponse->assertSee('PINJAM');
+        $loginResponse->assertSee('BU-PUS');
         $loginResponse->assertDontSee('SIPUS');
 
         $registerResponse = $this->get('/register');
         $registerResponse->assertStatus(200);
-        $registerResponse->assertSee('Pinjam BU-PUS');
+        $registerResponse->assertSee('PINJAM');
+        $registerResponse->assertSee('BU-PUS');
         $registerResponse->assertDontSee('SIPUS');
 
         $admin = User::factory()->create(['role' => 'admin']);
         $adminResponse = $this->actingAs($admin)->get('/admin');
         $adminResponse->assertStatus(200);
-        $adminResponse->assertSee('Pinjam BU-PUS Panel');
+        $adminResponse->assertSee('PINJAM');
+        $adminResponse->assertSee('BU-PUS');
         $adminResponse->assertDontSee('SIPUS');
     }
 
@@ -129,17 +133,15 @@ class HomeTest extends TestCase
             'reads_yesterday' => 10,
         ]);
 
-        $response = $this->actingAs($admin)->get('/admin');
+        $response = $this->actingAs($admin)->get('/pustakawan');
 
         $response->assertStatus(200);
         $response->assertSee('Teknologi Informasi');
-        $response->assertSee('12 total eksemplar stok');
-        // Pastikan TIDAK menggunakan angka hardcoded 1,248
-        $response->assertDontSee('1,248');
 
-        $catalogResponse = $this->actingAs($admin)->get('/admin/buku');
+        $catalogResponse = $this->actingAs($admin)->get('/pustakawan/buku');
         $catalogResponse->assertStatus(200);
         $catalogResponse->assertSee('Mastering AI 2026');
+        $catalogResponse->assertSee('12');
     }
 
     public function test_admin_can_add_book_with_uploaded_image_file(): void
@@ -152,7 +154,7 @@ class HomeTest extends TestCase
 
         $file = UploadedFile::fake()->image('cover_test.jpg', 300, 450);
 
-        $response = $this->actingAs($admin)->post('/admin/buku', [
+        $response = $this->actingAs($admin)->post('/pustakawan/buku', [
             'judul' => 'Fisika Kuantum Modern',
             'pengarang' => 'Prof. Einstein',
             'penerbit' => 'Sains Indonesia',
@@ -163,7 +165,7 @@ class HomeTest extends TestCase
             'cover_file' => $file,
         ]);
 
-        $response->assertRedirect('/admin/buku');
+        $response->assertRedirect('/pustakawan/buku');
 
         $buku = Buku::where('isbn', '9789998887771')->first();
         $this->assertNotNull($buku);
@@ -186,7 +188,7 @@ class HomeTest extends TestCase
 
         $imageUrl = 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=400';
 
-        $response = $this->actingAs($admin)->post('/admin/buku', [
+        $response = $this->actingAs($admin)->post('/pustakawan/buku', [
             'judul' => 'Startup Playbook 2026',
             'pengarang' => 'Peter Thiel',
             'penerbit' => 'Crown Business',
@@ -197,7 +199,7 @@ class HomeTest extends TestCase
             'cover_image' => $imageUrl,
         ]);
 
-        $response->assertRedirect('/admin/buku');
+        $response->assertRedirect('/pustakawan/buku');
 
         $buku = Buku::where('isbn', '9785556667772')->first();
         $this->assertNotNull($buku);

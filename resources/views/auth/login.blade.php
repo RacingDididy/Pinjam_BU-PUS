@@ -93,7 +93,8 @@
         authLoading: false,
         authError: '',
         authSuccessMsg: '',
-        devVerifyUrl: '',
+        otpCodeInput: '',
+        generatedOtpCode: '',
         verifyPollTimer: null,
         switchStep(step) {
             this.authError = '';
@@ -156,7 +157,8 @@
                 if (res.ok && data.success) {
                     window.location.href = data.redirect || '{{ route('home') }}';
                 } else if (data.needs_verification) {
-                    this.devVerifyUrl = data.dev_verification_url || '';
+                    this.generatedOtpCode = data.verification_code || '';
+                    this.otpCodeInput = '';
                     this.authSuccessMsg = data.message;
                     this.switchStep('waiting_verification');
                 } else {
@@ -185,7 +187,8 @@
                 });
                 const data = await res.json();
                 if (res.ok && data.success) {
-                    this.devVerifyUrl = data.dev_verification_url || '';
+                    this.generatedOtpCode = data.verification_code || '';
+                    this.otpCodeInput = '';
                     this.authSuccessMsg = data.message;
                     this.switchStep('waiting_verification');
                 } else if (data.already_registered) {
@@ -227,8 +230,9 @@
                     this.authSuccessMsg = data.message || 'Identitas terverifikasi! Silakan buat kata sandi baru.';
                     this.switchStep('set_password');
                 } else if (res.ok && data.success) {
-                    this.devVerifyUrl = data.dev_verification_url || '';
-                    this.authSuccessMsg = data.message || 'Tautan pemulihan kata sandi telah dikirim ke email Anda.';
+                    this.generatedOtpCode = data.verification_code || '';
+                    this.otpCodeInput = '';
+                    this.authSuccessMsg = data.message || 'Kode pemulihan kata sandi telah dikirim ke email Anda.';
                     this.switchStep('waiting_verification');
                 } else {
                     const firstErr = data.errors ? Object.values(data.errors)[0][0] : null;
@@ -240,22 +244,41 @@
                 this.authLoading = false;
             }
         },
-        async triggerDirectVerify() {
-            if (!this.devVerifyUrl || this.authLoading) return;
+        async submitOtpCodeVerify() {
+            const cleanCode = (this.otpCodeInput || '').replace(/\D/g, '');
+            if (cleanCode.length !== 6) {
+                this.authError = 'Masukkan 6 digit angka kode verifikasi.';
+                return;
+            }
+            if (this.authLoading) return;
             this.authLoading = true;
+            this.authError = '';
             try {
-                const res = await fetch(this.devVerifyUrl, { headers: { 'Accept': 'application/json' } });
+                const res = await fetch('{{ route('verification.verify') }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                    },
+                    body: JSON.stringify({
+                        email: this.authEmail,
+                        code: cleanCode
+                    })
+                });
                 const data = await res.json();
                 if (res.ok && data.verified) {
                     this.stopPolling();
                     this.authPassword = '';
                     this.authPasswordConfirm = '';
                     this.authError = '';
-                    this.authSuccessMsg = data.message;
+                    this.authSuccessMsg = data.message || 'Kode verifikasi berhasil! Silakan buat kata sandi Anda.';
                     this.authStep = 'set_password';
+                } else {
+                    this.authError = data.message || 'Kode verifikasi tidak sesuai.';
                 }
             } catch (e) {
-                window.location.href = this.devVerifyUrl;
+                this.authError = 'Terjadi gangguan jaringan saat memverifikasi kode.';
             } finally {
                 this.authLoading = false;
             }
@@ -275,7 +298,7 @@
                 });
                 const data = await res.json();
                 if (res.ok && data.success) {
-                    this.devVerifyUrl = data.dev_verification_url || this.devVerifyUrl;
+                    this.generatedOtpCode = data.verification_code || this.generatedOtpCode;
                     this.authSuccessMsg = data.message;
                 }
             } catch (e) {} finally {
@@ -583,37 +606,54 @@
 
             <!-- Menunggu verifikasi email -->
             <div x-show="authStep === 'waiting_verification'" class="space-y-3.5 text-center" style="display: none;">
-                <div class="p-4 rounded-2xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/80 space-y-2.5">
+                <div class="p-4 rounded-2xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/80 space-y-2">
                     <div class="w-11 h-11 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto text-xl shadow-sm">
-                        <i class="ph-bold ph-envelope-open animate-bounce" aria-hidden="true"></i>
+                        <i class="ph-bold ph-shield-check" aria-hidden="true"></i>
                     </div>
                     <p class="text-xs text-slate-700 dark:text-slate-200 leading-relaxed">
-                        Silakan buka kotak masuk <strong>Gmail</strong> Anda lalu tekan tombol <strong>"Verifikasi Email &amp; Buat Password"</strong>.
+                        Masukkan <strong>6 digit kode verifikasi</strong> yang dikirim ke <strong x-text="authEmail"></strong>, atau tekan tombol konfirmasi di kotak masuk Gmail Anda.
                     </p>
-                    <div class="inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                        <i class="ph-bold ph-spinner animate-spin" aria-hidden="true"></i>
-                        <span>Menunggu Anda menekan tombol verifikasi di email...</span>
+                    <div x-show="generatedOtpCode" class="pt-1">
+                        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 shadow-xs">
+                            <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Kode Anda:</span>
+                            <strong class="font-mono text-sm font-extrabold tracking-widest text-blue-600 dark:text-blue-400" x-text="generatedOtpCode"></strong>
+                            <button
+                                type="button"
+                                @click="otpCodeInput = generatedOtpCode; submitOtpCodeVerify()"
+                                class="px-2 py-0.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] transition-colors"
+                            >
+                                Pakai Kode
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div x-show="devVerifyUrl" class="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 space-y-2">
-                    <p class="text-[11px] font-semibold text-amber-800 dark:text-amber-300">
-                        Mode Lokal Terdeteksi: Klik tombol di bawah untuk mensimulasikan menekan tombol verifikasi di Gmail:
-                    </p>
-                    <button 
-                        type="button"
-                        @click="triggerDirectVerify()"
-                        :disabled="authLoading"
-                        class="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs inline-flex items-center justify-center gap-1.5 shadow-sm transition-colors"
+                <form @submit.prevent="submitOtpCodeVerify()" class="space-y-2.5 text-left">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 text-center">Kode Verifikasi (6 Digit)</label>
+                        <input
+                            type="text"
+                            inputmode="numeric"
+                            maxlength="6"
+                            x-model="otpCodeInput"
+                            @input="otpCodeInput = otpCodeInput.replace(/\D/g, '').slice(0, 6); if (otpCodeInput.length === 6) submitOtpCodeVerify();"
+                            placeholder="• • • • • •"
+                            class="w-full text-center font-mono text-lg sm:text-xl font-extrabold tracking-[0.45em] bg-slate-50 dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white outline-none focus:border-blue-600 transition-colors"
+                        >
+                    </div>
+                    <button
+                        type="submit"
+                        :disabled="authLoading || (otpCodeInput || '').length !== 6"
+                        class="w-full min-h-[42px] bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm py-2.5 rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                        <i class="ph-bold ph-check-circle text-sm" aria-hidden="true"></i>
-                        <span>Verifikasi Email Sekarang (Klik Tombol Gmail)</span>
+                        <i class="ph-bold text-base" :class="authLoading ? 'ph-spinner animate-spin' : 'ph-check-circle'" aria-hidden="true"></i>
+                        <span x-text="authLoading ? 'Memverifikasi...' : 'Verifikasi Kode Sekarang'"></span>
                     </button>
-                </div>
+                </form>
 
                 <div class="flex items-center justify-between gap-2 pt-1 text-xs">
                     <button type="button" @click="resendEmail()" :disabled="authLoading" class="font-bold text-blue-600 dark:text-blue-400 hover:underline">
-                        Kirim Ulang Email
+                        Kirim Ulang Kode
                     </button>
                     <button type="button" @click="switchStep('register')" class="font-semibold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
                         Ganti Alamat Email

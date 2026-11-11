@@ -51,21 +51,19 @@ class AuthController extends Controller
                 $mailResult = $this->issueAndSendVerificationLink($user);
                 $token = $mailResult['token'];
                 $request->session()->put('pending_register_user_id', $user->id);
-                $showFallbackBtn = in_array(config('mail.default'), ['log', 'array'], true) || ! $mailResult['mail_sent'];
 
                 if ($request->wantsJson()) {
                     return response()->json([
                         'success' => false,
                         'needs_verification' => true,
                         'email' => $user->email,
-                        'dev_verification_url' => $showFallbackBtn
-                            ? route('verification.link', ['id' => $user->id, 'token' => $token])
-                            : null,
-                        'message' => 'Email Anda belum diverifikasi. Kami baru saja mengirimkan ulang tautan verifikasi ke '.$user->email.'.',
+                        'verification_code' => $token,
+                        'mail_sent' => $mailResult['mail_sent'],
+                        'message' => 'Email Anda belum diverifikasi. Kami baru saja mengirimkan kode verifikasi 6 digit ke '.$user->email.'.',
                     ], 422);
                 }
 
-                return back()->withErrors(['email' => 'Silakan verifikasi email Anda terlebih dahulu melalui tautan yang dikirim ke Gmail.']);
+                return back()->withErrors(['email' => 'Silakan verifikasi email Anda terlebih dahulu melalui kode yang dikirim ke Gmail.']);
             }
 
             $request->session()->regenerate();
@@ -167,16 +165,14 @@ class AuthController extends Controller
         $token = $mailResult['token'];
         $request->session()->put('pending_register_user_id', $user->id);
 
-        $showFallbackBtn = in_array(config('mail.default'), ['log', 'array'], true) || ! $mailResult['mail_sent'];
-        $verificationUrl = route('verification.link', ['id' => $user->id, 'token' => $token]);
-
         if ($request->wantsJson()) {
             return response()->json([
                 'success' => true,
                 'step' => 'waiting_verification',
                 'email' => $user->email,
-                'message' => 'Email verifikasi telah dikirim ke '.$user->email.'. Silakan tekan tombol Verifikasi di Gmail Anda.',
-                'dev_verification_url' => $showFallbackBtn ? $verificationUrl : null,
+                'verification_code' => $token,
+                'mail_sent' => $mailResult['mail_sent'],
+                'message' => 'Kode verifikasi 6 digit telah dikirim ke '.$user->email.'. Masukkan kode di bawah atau klik tautan di Gmail Anda.',
             ]);
         }
 
@@ -341,20 +337,18 @@ class AuthController extends Controller
             ]);
         }
 
-        // Metode pemulihan 1: Kirim tautan verifikasi reset password ke Email
+        // Metode pemulihan 1: Kirim tautan & kode verifikasi reset password ke Email
         $mailResult = $this->issueAndSendVerificationLink($user);
         $token = $mailResult['token'];
         $request->session()->put('pending_register_user_id', $user->id);
-
-        $showFallbackBtn = in_array(config('mail.default'), ['log', 'array'], true) || ! $mailResult['mail_sent'];
-        $verificationUrl = route('verification.link', ['id' => $user->id, 'token' => $token]);
 
         return response()->json([
             'success' => true,
             'step' => 'waiting_verification',
             'email' => $user->email,
-            'message' => 'Tautan reset kata sandi telah dikirim ke '.$user->email.'. Silakan buka Gmail Anda.',
-            'dev_verification_url' => $showFallbackBtn ? $verificationUrl : null,
+            'verification_code' => $token,
+            'mail_sent' => $mailResult['mail_sent'],
+            'message' => 'Kode verifikasi 6 digit telah dikirim ke '.$user->email.'. Masukkan kode di bawah atau buka Gmail Anda.',
         ]);
     }
 
@@ -442,13 +436,13 @@ class AuthController extends Controller
 
         $mailResult = $this->issueAndSendVerificationLink($user);
         $token = $mailResult['token'];
-        $showFallbackBtn = in_array(config('mail.default'), ['log', 'array'], true) || ! $mailResult['mail_sent'];
-        $verificationUrl = route('verification.link', ['id' => $user->id, 'token' => $token]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Tautan verifikasi baru telah dikirim ke '.$user->email.'.',
-            'dev_verification_url' => $showFallbackBtn ? $verificationUrl : null,
+            'verification_code' => $token,
+            'dev_code' => $token,
+            'mail_sent' => $mailResult['mail_sent'],
+            'message' => 'Kode verifikasi 6 digit baru telah dikirim ke '.$user->email.'.',
         ]);
     }
 
@@ -459,7 +453,73 @@ class AuthController extends Controller
 
     public function verifyCode(Request $request): JsonResponse
     {
-        return $this->checkVerificationStatus($request);
+        $codeInput = preg_replace('/\D/', '', (string) $request->input('code', ''));
+
+        if ($codeInput === '') {
+            return $this->checkVerificationStatus($request);
+        }
+
+        if (strlen($codeInput) !== 6) {
+            return response()->json([
+                'success' => false,
+                'verified' => false,
+                'message' => 'Masukkan 6 digit angka kode verifikasi dengan lengkap.',
+            ], 422);
+        }
+
+        $user = null;
+        if ($request->filled('email')) {
+            $user = User::where('email', strtolower(trim((string) $request->input('email'))))->first();
+        }
+        if (! $user && $request->session()->has('pending_register_user_id')) {
+            $user = User::find($request->session()->get('pending_register_user_id'));
+        }
+        if (! $user && Auth::check()) {
+            $user = Auth::user();
+        }
+
+        if (! $user) {
+            return response()->json([
+                'success' => false,
+                'verified' => false,
+                'message' => 'Sesi pendaftaran tidak ditemukan. Silakan masukkan ulang alamat email Anda.',
+            ], 404);
+        }
+
+        if ((string) $user->verification_code !== $codeInput) {
+            return response()->json([
+                'success' => false,
+                'verified' => false,
+                'message' => 'Kode verifikasi tidak sesuai. Silakan periksa kembali kode 6 digit Anda.',
+            ], 422);
+        }
+
+        if ($user->verification_code_expires_at && $user->verification_code_expires_at->isPast()) {
+            return response()->json([
+                'success' => false,
+                'verified' => false,
+                'message' => 'Kode verifikasi telah kedaluwarsa. Silakan klik Kirim Ulang Kode.',
+            ], 422);
+        }
+
+        $user->update([
+            'email_verified_at' => $user->email_verified_at ?? now(),
+            'verification_code' => null,
+            'verification_code_expires_at' => null,
+        ]);
+
+        Auth::login($user, true);
+        $request->session()->put('needs_password_setup', true);
+        $request->session()->put('setup_password_email', $user->email);
+
+        return response()->json([
+            'success' => true,
+            'verified' => true,
+            'step' => 'set_password',
+            'email' => $user->email,
+            'redirect_url' => route('home', ['setup_password' => 1]),
+            'message' => 'Kode verifikasi berhasil dikonfirmasi! Silakan buat kata sandi baru untuk akun Anda.',
+        ]);
     }
 
     public function logout(Request $request): RedirectResponse
@@ -477,7 +537,7 @@ class AuthController extends Controller
      */
     protected function issueAndSendVerificationLink(User $user): array
     {
-        $token = Str::random(32);
+        $token = (string) random_int(100000, 999999);
 
         $user->update([
             'verification_code' => $token,

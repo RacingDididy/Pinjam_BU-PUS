@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,12 +19,41 @@ class Buku extends Model
     {
         return [
             'gallery_images' => 'array',
+            'tanggal_terbit' => 'date',
             'tahun_terbit' => 'integer',
             'tebal_halaman' => 'integer',
             'stok' => 'integer',
             'views_count' => 'integer',
             'reads_yesterday' => 'integer',
         ];
+    }
+
+    public function getTanggalTerbitFormattedAttribute(): string
+    {
+        if ($this->tanggal_terbit instanceof CarbonInterface) {
+            $bulan = [
+                1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+                5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+                9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+            ];
+
+            return $this->tanggal_terbit->format('d').' '.($bulan[(int) $this->tanggal_terbit->format('n')] ?? $this->tanggal_terbit->format('F')).' '.$this->tanggal_terbit->format('Y');
+        }
+
+        return $this->tahun_terbit ? (string) $this->tahun_terbit : '-';
+    }
+
+    public function getTanggalTerbitInputAttribute(): string
+    {
+        if ($this->tanggal_terbit instanceof CarbonInterface) {
+            return $this->tanggal_terbit->format('Y-m-d');
+        }
+
+        if ($this->tahun_terbit) {
+            return sprintf('%04d-01-15', (int) $this->tahun_terbit);
+        }
+
+        return now()->format('Y-m-d');
     }
 
     public function kategori(): BelongsTo

@@ -129,6 +129,55 @@
     class="space-y-5 sm:space-y-6"
 >
 
+    <!-- Panel Cepat Export Laporan Excel (Data Peminjaman & Data Buku: Sudah Jadi & Raw) -->
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center text-xl shrink-0">
+                <i class="ph-bold ph-microsoft-excel-logo"></i>
+            </div>
+            <div>
+                <h2 class="text-xs sm:text-sm font-extrabold text-slate-900">Export Laporan Excel (.xlsx) &mdash; Data Jadi &amp; Data Raw</h2>
+                <p class="text-[11px] text-slate-500">Unduh laporan peminjaman atau katalog buku dalam bentuk tabel siap cetak maupun data mentah (raw).</p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+            <!-- Export Peminjaman -->
+            <div class="inline-flex items-center rounded-xl border border-blue-200 bg-blue-50/60 p-1 gap-1">
+                <span class="px-2 text-[11px] font-extrabold text-blue-800 flex items-center gap-1">
+                    <i class="ph-bold ph-Arrows-Left-Right"></i>
+                    <span>Peminjaman:</span>
+                </span>
+                <a :href="'{{ route('pustakawan.export.peminjaman') }}?mode=formatted&status=' + activeTab" class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-blue-600 hover:text-white text-blue-700 border border-blue-200/80 text-[11px] font-bold transition-colors shadow-2xs">
+                    Data Jadi
+                </a>
+                <a :href="'{{ route('pustakawan.export.peminjaman') }}?mode=raw&status=' + activeTab" class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-800 hover:text-white text-slate-700 border border-slate-200 text-[11px] font-bold transition-colors shadow-2xs">
+                    Data Raw
+                </a>
+                <a :href="'{{ route('pustakawan.export.peminjaman') }}?mode=both&status=' + activeTab" class="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold transition-colors shadow-2xs">
+                    Lengkap (2 Sheet)
+                </a>
+            </div>
+
+            <!-- Export Buku -->
+            <div class="inline-flex items-center rounded-xl border border-emerald-200 bg-emerald-50/60 p-1 gap-1">
+                <span class="px-2 text-[11px] font-extrabold text-emerald-800 flex items-center gap-1">
+                    <i class="ph-bold ph-books"></i>
+                    <span>Buku:</span>
+                </span>
+                <a href="{{ route('pustakawan.export.buku', ['mode' => 'formatted']) }}" class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-emerald-600 hover:text-white text-emerald-700 border border-emerald-200/80 text-[11px] font-bold transition-colors shadow-2xs">
+                    Data Jadi
+                </a>
+                <a href="{{ route('pustakawan.export.buku', ['mode' => 'raw']) }}" class="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-800 hover:text-white text-slate-700 border border-slate-200 text-[11px] font-bold transition-colors shadow-2xs">
+                    Data Raw
+                </a>
+                <a href="{{ route('pustakawan.export.buku', ['mode' => 'both']) }}" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition-colors shadow-2xs">
+                    Lengkap (2 Sheet)
+                </a>
+            </div>
+        </div>
+    </div>
+
     <!-- Ringkasan status laporan -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
         <button type="button" @click="setTab('all')" class="text-left p-3.5 rounded-2xl border transition-all" :class="activeTab === 'all' ? 'bg-slate-900 text-white border-slate-900 shadow-sm' : 'bg-white border-slate-200/80 hover:border-slate-400'">

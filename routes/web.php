@@ -64,13 +64,13 @@ Route::middleware('guest')->group(function () {
 // Verifikasi email dan setup password
 Route::get('/email/verify-link/{id}/{token}', [AuthController::class, 'verifyFromEmailLink'])->name('verification.link');
 Route::get('/auth/check-verification', [AuthController::class, 'checkVerificationStatus'])->name('auth.check.verification');
+Route::post('/email/verify', [AuthController::class, 'verifyCode'])->name('verification.verify');
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])->name('auth.password.forgot');
 Route::post('/auth/setup-password', [AuthController::class, 'setupPassword'])->name('auth.password.setup');
 Route::post('/email/verification-notification', [AuthController::class, 'resendVerificationCode'])->name('verification.resend');
 
 Route::middleware('auth')->group(function () {
     Route::get('/email/verify', [AuthController::class, 'showVerifyForm'])->name('verification.notice');
-    Route::post('/email/verify', [AuthController::class, 'verifyCode'])->name('verification.verify');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
 
@@ -114,13 +114,19 @@ Route::prefix('pustakawan')->name('pustakawan.')->middleware(['auth', 'pustakawa
     Route::post('/peminjaman/{kodeTransaksi}/reject', [PustakawanDashboardController::class, 'rejectLoan'])->name('peminjaman.reject');
     Route::post('/peminjaman/{kodeTransaksi}/complete', [PustakawanDashboardController::class, 'completeLoan'])->name('peminjaman.complete');
 
+    // Export Laporan Excel (.xlsx) - Data Jadi & Data Raw
+    Route::get('/export/buku', [PustakawanDashboardController::class, 'exportBuku'])->name('export.buku');
+    Route::get('/export/peminjaman', [PustakawanDashboardController::class, 'exportPeminjaman'])->name('export.peminjaman');
+
     // Kategori buku
     Route::post('/kategori', [PustakawanDashboardController::class, 'storeKategori'])->name('kategori.store');
+    Route::post('/kategori/quick', [AdminBukuController::class, 'quickStoreKategori'])->name('kategori.quick');
     Route::post('/kategori/bulk-delete', [PustakawanDashboardController::class, 'bulkDestroyKategori'])->name('kategori.bulk-destroy');
     Route::put('/kategori/{kategori}', [PustakawanDashboardController::class, 'updateKategori'])->name('kategori.update');
     Route::delete('/kategori/{kategori}', [PustakawanDashboardController::class, 'destroyKategori'])->name('kategori.destroy');
 
     // Katalog buku
+    Route::patch('/buku/{buku}/stok', [AdminBukuController::class, 'updateStock'])->name('buku.stok');
     Route::delete('/buku-bulk-delete', [AdminBukuController::class, 'bulkDestroy'])->name('buku.bulk-destroy');
     Route::resource('buku', AdminBukuController::class);
 });

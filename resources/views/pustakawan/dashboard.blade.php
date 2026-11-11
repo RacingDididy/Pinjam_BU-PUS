@@ -54,7 +54,61 @@
                     Seluruh metrik dihitung otomatis secara real-time dari katalog buku, transaksi peminjaman, dan aktivitas pembaca.
                 </p>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2" x-data="{ openExportDash: false }">
+                <div class="relative" @click.away="openExportDash = false">
+                    <button
+                        type="button"
+                        @click="openExportDash = !openExportDash"
+                        class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-colors"
+                    >
+                        <i class="ph-bold ph-microsoft-excel-logo text-sm"></i>
+                        <span>Export Laporan Excel (.xlsx)</span>
+                        <i class="ph-bold ph-caret-down text-[10px]"></i>
+                    </button>
+
+                    <div
+                        x-show="openExportDash"
+                        x-cloak
+                        x-transition
+                        class="absolute right-0 mt-2 w-80 rounded-2xl bg-white border border-slate-200 shadow-2xl p-3 z-40 space-y-2.5"
+                    >
+                        <div class="border-b border-slate-100 pb-2">
+                            <p class="text-xs font-extrabold text-slate-900">Pusat Unduh Laporan Excel (.xlsx)</p>
+                            <p class="text-[10px] text-slate-500">Pilih Data Sudah Jadi (Siap Cetak) atau Data Raw (Mentah)</p>
+                        </div>
+
+                        <div class="space-y-1">
+                            <p class="text-[10px] font-extrabold text-emerald-700 uppercase tracking-wider px-1">1. Export Katalog Buku</p>
+                            <div class="grid grid-cols-3 gap-1.5">
+                                <a href="{{ route('pustakawan.export.buku', ['mode' => 'formatted']) }}" class="px-2 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[11px] font-bold text-center transition-colors">
+                                    Data Jadi
+                                </a>
+                                <a href="{{ route('pustakawan.export.buku', ['mode' => 'raw']) }}" class="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-bold text-center transition-colors">
+                                    Data Raw
+                                </a>
+                                <a href="{{ route('pustakawan.export.buku', ['mode' => 'both']) }}" class="px-2 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold text-center transition-colors">
+                                    2 Sheet
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1 pt-1 border-t border-slate-100">
+                            <p class="text-[10px] font-extrabold text-blue-700 uppercase tracking-wider px-1">2. Export Data Peminjaman</p>
+                            <div class="grid grid-cols-3 gap-1.5">
+                                <a href="{{ route('pustakawan.export.peminjaman', ['mode' => 'formatted']) }}" class="px-2 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-[11px] font-bold text-center transition-colors">
+                                    Data Jadi
+                                </a>
+                                <a href="{{ route('pustakawan.export.peminjaman', ['mode' => 'raw']) }}" class="px-2 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-[11px] font-bold text-center transition-colors">
+                                    Data Raw
+                                </a>
+                                <a href="{{ route('pustakawan.export.peminjaman', ['mode' => 'both']) }}" class="px-2 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold text-center transition-colors">
+                                    2 Sheet
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <a 
                     href="{{ route('pustakawan.laporan', ['tab' => 'menunggu_approval']) }}"
                     class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-colors"
@@ -64,7 +118,7 @@
                 </a>
                 <a 
                     href="{{ route('pustakawan.buku.create') }}"
-                    class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-colors"
+                    class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-sm transition-colors"
                 >
                     <i class="ph-bold ph-plus-circle text-sm"></i>
                     <span>Tambah Buku</span>

@@ -63,5 +63,7 @@ class DatabaseSeeder extends Seeder
                 ['deskripsi' => $deskripsi]
             );
         }
+
+        $this->call(KoleksiPerpustakaanSeeder::class);
     }
 }

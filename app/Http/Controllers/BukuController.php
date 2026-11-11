@@ -315,10 +315,22 @@ class BukuController extends Controller
         ]);
 
         if ($request->wantsJson()) {
+            /** @var User $authUser */
+            $authUser = auth()->user();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Terima kasih! Komentar dan rating berhasil dikirim.',
-                'rating' => $rating,
+                'rating' => [
+                    'id' => $rating->id,
+                    'nama_penilai' => $authUser->name,
+                    'bintang' => (int) $rating->bintang,
+                    'ulasan' => $rating->ulasan,
+                    'waktu' => 'Baru saja',
+                    'avatar_url' => $authUser->avatar_url,
+                    'initial' => $authUser->initial,
+                    'palette' => $authUser->color_palette,
+                ],
             ]);
         }
 

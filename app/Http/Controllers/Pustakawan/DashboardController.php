@@ -9,11 +9,13 @@ use App\Models\Peminjaman;
 use App\Models\Rating;
 use App\Models\User;
 use App\Models\Wishlist;
+use App\Support\ExcelExportBuilder;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\Response;
 
 class DashboardController extends Controller
 {
@@ -87,6 +89,375 @@ class DashboardController extends Controller
             'studentsPayload',
             'reportMetrics'
         ));
+    }
+
+    public function exportBuku(Request $request): Response
+    {
+        $mode = strtolower((string) $request->query('mode', 'both'));
+        $search = trim((string) $request->query('search', ''));
+
+        $query = Buku::with('kategori')
+            ->withCount([
+                'peminjamans as kali_dipinjam_count' => fn ($q) => $q->where('status', '!=', 'ditolak'),
+                'ratings',
+                'wishlists',
+            ])
+            ->withSum([
+                'peminjamans as total_eksemplar_dipinjam' => fn ($q) => $q->where('status', '!=', 'ditolak'),
+            ], 'jumlah')
+            ->withAvg('ratings', 'bintang');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('judul', 'like', '%'.$search.'%')
+                    ->orWhere('pengarang', 'like', '%'.$search.'%')
+                    ->orWhere('isbn', 'like', '%'.$search.'%');
+            });
+        }
+
+        $bukus = $query->orderBy('kategori_id')->orderBy('judul')->get();
+        $totalJudul = $bukus->count();
+        $totalEksemplar = (int) $bukus->sum('stok');
+        $totalDipinjam = (int) $bukus->sum('total_eksemplar_dipinjam');
+        $printedAt = now()->translatedFormat('d F Y H:i').' WIB';
+
+        // 1. Sheet Data Sudah Jadi (Formatted Report)
+        $formattedRows = [
+            [['value' => 'LAPORAN DATA INDUK KOLEKSI BUKU PERPUSTAKAAN SMK NEGERI 5 SURAKARTA', 'style' => 1]],
+            [['value' => 'Dicetak pada: '.$printedAt.' | Total Judul: '.$totalJudul.' Buku | Total Stok Tersedia: '.$totalEksemplar.' Eksemplar | Total Pernah Dipinjam: '.$totalDipinjam.' Eksemplar', 'style' => 2]],
+            [],
+            [
+                ['value' => 'NO', 'style' => 3],
+                ['value' => 'KODE / ISBN', 'style' => 3],
+                ['value' => 'JUDUL BUKU', 'style' => 3],
+                ['value' => 'PENGARANG', 'style' => 3],
+                ['value' => 'PENERBIT', 'style' => 3],
+                ['value' => 'TANGGAL TERBIT', 'style' => 3],
+                ['value' => 'KATEGORI KOLEKSI', 'style' => 3],
+                ['value' => 'STOK TERSEDIA', 'style' => 3],
+                ['value' => 'STATUS STOK', 'style' => 3],
+                ['value' => 'DIPINJAM (EKS)', 'style' => 3],
+                ['value' => 'RATING', 'style' => 3],
+            ],
+        ];
+
+        foreach ($bukus as $idx => $b) {
+            $stok = (int) $b->stok;
+            $dipinjam = (int) ($b->total_eksemplar_dipinjam ?? 0);
+            $rating = round((float) ($b->ratings_avg_bintang ?? 0), 1);
+            $formattedRows[] = [
+                ['value' => $idx + 1, 'style' => 6, 'type' => 'number'],
+                ['value' => $b->isbn ?: '-', 'style' => 6],
+                ['value' => $b->judul, 'style' => 5],
+                ['value' => $b->pengarang ?: '-', 'style' => 5],
+                ['value' => $b->penerbit ?: '-', 'style' => 5],
+                ['value' => $b->tanggal_terbit_formatted, 'style' => 6],
+                ['value' => $b->kategori?->nama_kategori ?? 'Umum', 'style' => 6],
+                ['value' => $stok, 'style' => 7, 'type' => 'number'],
+                ['value' => $stok > 0 ? 'Tersedia ('.$stok.' Eks)' : 'Stok Habis', 'style' => $stok > 0 ? 9 : 11],
+                ['value' => $dipinjam, 'style' => 7, 'type' => 'number'],
+                ['value' => $rating > 0 ? number_format($rating, 1) : '-', 'style' => 6],
+            ];
+        }
+
+        $formattedRows[] = [
+            ['value' => '', 'style' => 8],
+            ['value' => 'TOTAL KESELURUHAN', 'style' => 8],
+            ['value' => $totalJudul.' Judul Buku', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => $totalEksemplar, 'style' => 8, 'type' => 'number'],
+            ['value' => 'Eksemplar Aktif', 'style' => 8],
+            ['value' => $totalDipinjam, 'style' => 8, 'type' => 'number'],
+            ['value' => '', 'style' => 8],
+        ];
+
+        $formattedSheet = [
+            'name' => 'Laporan Buku (Sudah Jadi)',
+            'rows' => $formattedRows,
+            'widths' => [6, 18, 42, 24, 24, 20, 22, 15, 18, 15, 10],
+            'merges' => ['A1:K1', 'A2:K2'],
+        ];
+
+        // 2. Sheet Data Raw / Mentah
+        $rawRows = [
+            [
+                ['value' => 'id', 'style' => 4],
+                ['value' => 'isbn', 'style' => 4],
+                ['value' => 'judul', 'style' => 4],
+                ['value' => 'pengarang', 'style' => 4],
+                ['value' => 'penerbit', 'style' => 4],
+                ['value' => 'tanggal_terbit', 'style' => 4],
+                ['value' => 'tahun_terbit', 'style' => 4],
+                ['value' => 'kategori_id', 'style' => 4],
+                ['value' => 'nama_kategori', 'style' => 4],
+                ['value' => 'stok', 'style' => 4],
+                ['value' => 'tebal_halaman', 'style' => 4],
+                ['value' => 'bahasa', 'style' => 4],
+                ['value' => 'views_count', 'style' => 4],
+                ['value' => 'kali_dipinjam_count', 'style' => 4],
+                ['value' => 'total_eksemplar_dipinjam', 'style' => 4],
+                ['value' => 'rating_avg', 'style' => 4],
+                ['value' => 'ratings_count', 'style' => 4],
+                ['value' => 'wishlists_count', 'style' => 4],
+                ['value' => 'cover_image', 'style' => 4],
+                ['value' => 'created_at', 'style' => 4],
+            ],
+        ];
+
+        foreach ($bukus as $b) {
+            $rawRows[] = [
+                ['value' => (int) $b->id, 'style' => 5, 'type' => 'number'],
+                ['value' => (string) ($b->isbn ?? ''), 'style' => 5],
+                ['value' => (string) $b->judul, 'style' => 5],
+                ['value' => (string) ($b->pengarang ?? ''), 'style' => 5],
+                ['value' => (string) ($b->penerbit ?? ''), 'style' => 5],
+                ['value' => $b->tanggal_terbit ? $b->tanggal_terbit->format('Y-m-d') : ($b->tahun_terbit ? $b->tahun_terbit.'-01-15' : ''), 'style' => 5],
+                ['value' => (int) ($b->tahun_terbit ?? 0), 'style' => 5, 'type' => 'number'],
+                ['value' => (int) ($b->kategori_id ?? 0), 'style' => 5, 'type' => 'number'],
+                ['value' => (string) ($b->kategori?->nama_kategori ?? 'Umum'), 'style' => 5],
+                ['value' => (int) $b->stok, 'style' => 5, 'type' => 'number'],
+                ['value' => (int) ($b->tebal_halaman ?? 0), 'style' => 5, 'type' => 'number'],
+                ['value' => (string) ($b->bahasa ?? 'Indonesia'), 'style' => 5],
+                ['value' => (int) ($b->views_count ?? 0), 'style' => 5, 'type' => 'number'],
+                ['value' => (int) ($b->kali_dipinjam_count ?? 0), 'style' => 5, 'type' => 'number'],
+                ['value' => (int) ($b->total_eksemplar_dipinjam ?? 0), 'style' => 5, 'type' => 'number'],
+                ['value' => round((float) ($b->ratings_avg_bintang ?? 0), 2), 'style' => 5, 'type' => 'number'],
+                ['value' => (int) ($b->ratings_count ?? 0), 'style' => 5, 'type' => 'number'],
+                ['value' => (int) ($b->wishlists_count ?? 0), 'style' => 5, 'type' => 'number'],
+                ['value' => (string) ($b->cover_image ?? ''), 'style' => 5],
+                ['value' => $b->created_at?->format('Y-m-d H:i:s') ?? '', 'style' => 5],
+            ];
+        }
+
+        $rawSheet = [
+            'name' => 'Data Raw Buku (Mentah)',
+            'rows' => $rawRows,
+            'widths' => [8, 18, 40, 24, 24, 15, 14, 12, 22, 10, 14, 14, 12, 16, 20, 12, 14, 14, 36, 20],
+        ];
+
+        $sheets = match ($mode) {
+            'formatted' => [$formattedSheet],
+            'raw' => [$rawSheet],
+            default => [$formattedSheet, $rawSheet],
+        };
+
+        $suffix = match ($mode) {
+            'formatted' => 'Sudah_Jadi',
+            'raw' => 'Data_Raw',
+            default => 'Lengkap_Jadi_dan_Raw',
+        };
+
+        $filename = 'Laporan_Koleksi_Buku_SMKN5_'.$suffix.'_'.now()->format('Ymd_His').'.xlsx';
+
+        return ExcelExportBuilder::download($filename, $sheets);
+    }
+
+    public function exportPeminjaman(Request $request): Response
+    {
+        $mode = strtolower((string) $request->query('mode', 'both'));
+        $statusFilter = strtolower((string) $request->query('status', 'all'));
+
+        $transactions = $this->buildPriorityLoanQueue();
+        if ($statusFilter !== '' && $statusFilter !== 'all') {
+            $transactions = array_values(array_filter(
+                $transactions,
+                fn (array $trx) => $trx['status'] === $statusFilter
+            ));
+        }
+
+        $allLoansQuery = Peminjaman::with(['buku.kategori', 'user', 'approver'])->latest();
+        if ($statusFilter !== '' && $statusFilter !== 'all') {
+            $allLoansQuery->where('status', $statusFilter);
+        }
+        $rawLoans = $allLoansQuery->get();
+
+        $totalTrx = count($transactions);
+        $totalBooksBorrowed = (int) collect($transactions)->sum('total_books');
+        $totalDendaRp = (int) collect($transactions)->sum('denda_rp');
+        $printedAt = now()->translatedFormat('d F Y H:i').' WIB';
+
+        // 1. Sheet Data Sudah Jadi (Formatted Report)
+        $formattedRows = [
+            [['value' => 'LAPORAN SIRKULASI & PEMINJAMAN BUKU PERPUSTAKAAN SMK NEGERI 5 SURAKARTA', 'style' => 1]],
+            [['value' => 'Dicetak pada: '.$printedAt.' | Total Transaksi: '.$totalTrx.' | Total Buku Dipinjam: '.$totalBooksBorrowed.' Eksemplar | Total Akumulasi Denda: Rp '.number_format($totalDendaRp, 0, ',', '.'), 'style' => 2]],
+            [],
+            [
+                ['value' => 'NO', 'style' => 3],
+                ['value' => 'KODE TRANSAKSI', 'style' => 3],
+                ['value' => 'NAMA PEMINJAM', 'style' => 3],
+                ['value' => 'KELAS', 'style' => 3],
+                ['value' => 'NISN / NIS', 'style' => 3],
+                ['value' => 'NO. WHATSAPP', 'style' => 3],
+                ['value' => 'DAFTAR BUKU DIPINJAM', 'style' => 3],
+                ['value' => 'TOTAL BUKU', 'style' => 3],
+                ['value' => 'TGL PINJAM', 'style' => 3],
+                ['value' => 'TENGGAT KEMBALI', 'style' => 3],
+                ['value' => 'TGL DIKEMBALIKAN', 'style' => 3],
+                ['value' => 'STATUS SIRKULASI', 'style' => 3],
+                ['value' => 'TERLAMBAT (HARI)', 'style' => 3],
+                ['value' => 'DENDA (RP)', 'style' => 3],
+            ],
+        ];
+
+        foreach ($transactions as $idx => $trx) {
+            $bookTitles = collect($trx['books'])
+                ->map(fn (array $b) => $b['judul'].' ('.$b['jumlah'].' Eks)')
+                ->implode('; ');
+
+            $statusStyle = match ($trx['status']) {
+                'selesai' => 9,
+                'terlambat', 'ditolak' => 11,
+                default => 10,
+            };
+
+            $formattedRows[] = [
+                ['value' => $idx + 1, 'style' => 6, 'type' => 'number'],
+                ['value' => $trx['kode_transaksi'], 'style' => 6],
+                ['value' => $trx['borrower']['name'], 'style' => 5],
+                ['value' => $trx['borrower']['nama_kelas'], 'style' => 6],
+                ['value' => $trx['borrower']['nisn'].' / '.$trx['borrower']['nis'], 'style' => 6],
+                ['value' => $trx['borrower']['no_whatsapp'], 'style' => 6],
+                ['value' => $bookTitles, 'style' => 5],
+                ['value' => (int) $trx['total_books'], 'style' => 7, 'type' => 'number'],
+                ['value' => $trx['tanggal_pengajuan'], 'style' => 6],
+                ['value' => $trx['tenggat_kembali'], 'style' => 6],
+                ['value' => $trx['tanggal_kembali'] ?: '-', 'style' => 6],
+                ['value' => $trx['status_label'], 'style' => $statusStyle],
+                ['value' => (int) $trx['overdue_days'], 'style' => 7, 'type' => 'number'],
+                ['value' => $trx['denda_formatted'], 'style' => ((int) $trx['denda_rp'] > 0) ? 11 : 6],
+            ];
+        }
+
+        $formattedRows[] = [
+            ['value' => '', 'style' => 8],
+            ['value' => 'TOTAL RINGKASAN', 'style' => 8],
+            ['value' => $totalTrx.' Transaksi', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => $totalBooksBorrowed, 'style' => 8, 'type' => 'number'],
+            ['value' => '', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => '', 'style' => 8],
+            ['value' => 'Rp '.number_format($totalDendaRp, 0, ',', '.'), 'style' => 8],
+        ];
+
+        $formattedSheet = [
+            'name' => 'Laporan Peminjaman (Jadi)',
+            'rows' => $formattedRows,
+            'widths' => [6, 20, 26, 15, 22, 18, 44, 13, 15, 16, 16, 20, 16, 18],
+            'merges' => ['A1:N1', 'A2:N2'],
+        ];
+
+        // 2. Sheet Data Raw / Mentah (Baris per Item Peminjaman)
+        $rawRows = [
+            [
+                ['value' => 'loan_id', 'style' => 4],
+                ['value' => 'kode_transaksi', 'style' => 4],
+                ['value' => 'status', 'style' => 4],
+                ['value' => 'prioritas', 'style' => 4],
+                ['value' => 'user_id', 'style' => 4],
+                ['value' => 'nama_peminjam', 'style' => 4],
+                ['value' => 'email_peminjam', 'style' => 4],
+                ['value' => 'nisn', 'style' => 4],
+                ['value' => 'nis', 'style' => 4],
+                ['value' => 'nama_kelas', 'style' => 4],
+                ['value' => 'no_whatsapp', 'style' => 4],
+                ['value' => 'buku_id', 'style' => 4],
+                ['value' => 'isbn_buku', 'style' => 4],
+                ['value' => 'judul_buku', 'style' => 4],
+                ['value' => 'kategori_buku', 'style' => 4],
+                ['value' => 'jumlah_eksemplar', 'style' => 4],
+                ['value' => 'tanggal_pinjam', 'style' => 4],
+                ['value' => 'tenggat_kembali', 'style' => 4],
+                ['value' => 'tanggal_kembali', 'style' => 4],
+                ['value' => 'hari_terlambat', 'style' => 4],
+                ['value' => 'denda_rp', 'style' => 4],
+                ['value' => 'keperluan', 'style' => 4],
+                ['value' => 'catatan_peminjam', 'style' => 4],
+                ['value' => 'catatan_pustakawan', 'style' => 4],
+                ['value' => 'disetujui_oleh', 'style' => 4],
+                ['value' => 'approved_at', 'style' => 4],
+                ['value' => 'created_at', 'style' => 4],
+            ],
+        ];
+
+        $today = Carbon::today();
+        foreach ($rawLoans as $loan) {
+            $borrower = $loan->user;
+            $qty = max(1, (int) ($loan->jumlah ?? 1));
+            $overdueDays = 0;
+            if ($loan->tenggat_kembali) {
+                $dueDate = Carbon::parse($loan->tenggat_kembali)->startOfDay();
+                if ($loan->status === 'terlambat' && $today->gt($dueDate)) {
+                    $overdueDays = (int) $dueDate->diffInDays($today);
+                } elseif ($loan->status === 'selesai' && $loan->tanggal_kembali) {
+                    $retDate = Carbon::parse($loan->tanggal_kembali)->startOfDay();
+                    if ($retDate->gt($dueDate)) {
+                        $overdueDays = (int) $dueDate->diffInDays($retDate);
+                    }
+                }
+            }
+            $dendaRp = $overdueDays * 1000 * $qty;
+
+            $rawRows[] = [
+                ['value' => (int) $loan->id, 'style' => 5, 'type' => 'number'],
+                ['value' => (string) ($loan->kode_transaksi ?: ('TRX-SINGLE-'.$loan->id)), 'style' => 5],
+                ['value' => (string) $loan->status, 'style' => 5],
+                ['value' => (string) ($loan->prioritas ?: 'normal'), 'style' => 5],
+                ['value' => (int) ($loan->user_id ?? 0), 'style' => 5, 'type' => 'number'],
+                ['value' => (string) ($borrower?->name ?? $loan->nama_peminjam ?? ''), 'style' => 5],
+                ['value' => (string) ($borrower?->email ?? ''), 'style' => 5],
+                ['value' => (string) ($borrower?->nisn ?? ''), 'style' => 5],
+                ['value' => (string) ($borrower?->nis ?? ''), 'style' => 5],
+                ['value' => (string) ($borrower?->nama_kelas ?? ''), 'style' => 5],
+                ['value' => (string) ($borrower?->no_whatsapp ?? ''), 'style' => 5],
+                ['value' => (int) ($loan->buku_id ?? 0), 'style' => 5, 'type' => 'number'],
+                ['value' => (string) ($loan->buku?->isbn ?? ''), 'style' => 5],
+                ['value' => (string) ($loan->buku?->judul ?? 'Buku Terhapus'), 'style' => 5],
+                ['value' => (string) ($loan->buku?->kategori?->nama_kategori ?? 'Umum'), 'style' => 5],
+                ['value' => $qty, 'style' => 5, 'type' => 'number'],
+                ['value' => $loan->tanggal_pinjam?->format('Y-m-d') ?? '', 'style' => 5],
+                ['value' => $loan->tenggat_kembali?->format('Y-m-d') ?? '', 'style' => 5],
+                ['value' => $loan->tanggal_kembali?->format('Y-m-d') ?? '', 'style' => 5],
+                ['value' => $overdueDays, 'style' => 5, 'type' => 'number'],
+                ['value' => $dendaRp, 'style' => 5, 'type' => 'number'],
+                ['value' => (string) ($loan->keperluan ?? ''), 'style' => 5],
+                ['value' => (string) ($loan->catatan_peminjam ?? ''), 'style' => 5],
+                ['value' => (string) ($loan->catatan_pustakawan ?? ''), 'style' => 5],
+                ['value' => (string) ($loan->approver?->name ?? ''), 'style' => 5],
+                ['value' => $loan->approved_at?->format('Y-m-d H:i:s') ?? '', 'style' => 5],
+                ['value' => $loan->created_at?->format('Y-m-d H:i:s') ?? '', 'style' => 5],
+            ];
+        }
+
+        $rawSheet = [
+            'name' => 'Data Raw Peminjaman (Mentah)',
+            'rows' => $rawRows,
+            'widths' => [10, 20, 18, 12, 10, 26, 26, 15, 12, 15, 18, 10, 18, 36, 22, 16, 15, 15, 15, 14, 14, 24, 24, 24, 20, 20, 20],
+        ];
+
+        $sheets = match ($mode) {
+            'formatted' => [$formattedSheet],
+            'raw' => [$rawSheet],
+            default => [$formattedSheet, $rawSheet],
+        };
+
+        $suffix = match ($mode) {
+            'formatted' => 'Sudah_Jadi',
+            'raw' => 'Data_Raw',
+            default => 'Lengkap_Jadi_dan_Raw',
+        };
+
+        $filename = 'Laporan_Peminjaman_SMKN5_'.$suffix.'_'.now()->format('Ymd_His').'.xlsx';
+
+        return ExcelExportBuilder::download($filename, $sheets);
     }
 
     public function approveLoan(Request $request, string $kodeTransaksi): JsonResponse

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Http\Controllers\BukuController;
 use App\Models\Kategori;
+use Database\Seeders\KoleksiPerpustakaanSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\URL;
@@ -47,6 +48,19 @@ class AppServiceProvider extends ServiceProvider
 
                 if (! Schema::hasTable('kategoris')) {
                     Artisan::call('migrate', ['--force' => true, '--seed' => true]);
+                } else {
+                    if (Schema::hasTable('bukus') && ! Schema::hasColumn('bukus', 'tanggal_terbit')) {
+                        Artisan::call('migrate', ['--force' => true]);
+                    }
+
+                    $seedLock = ($dbPath && $dbPath !== ':memory:') ? (dirname($dbPath).'/koleksi_500_v1.lock') : null;
+                    if ($seedLock && ! file_exists($seedLock)) {
+                        Artisan::call('db:seed', [
+                            '--class' => KoleksiPerpustakaanSeeder::class,
+                            '--force' => true,
+                        ]);
+                        @file_put_contents($seedLock, now()->toIso8601String());
+                    }
                 }
             } catch (Throwable) {
                 //
