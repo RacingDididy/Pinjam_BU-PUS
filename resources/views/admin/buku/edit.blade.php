@@ -90,9 +90,10 @@
             if (n.includes('komputer') || n.includes('teknologi') || n.includes('informatika') || n.includes('rpl')) return 'ph-desktop-tower';
             if (n.includes('agama') || n.includes('islam')) return 'ph-mosque';
             if (n.includes('bahasa') || n.includes('inggris') || n.includes('indonesia')) return 'ph-translate';
-            if (n.includes('sains') || n.includes('ipa') || n.includes('matematika') || n.includes('fisika') || n.includes('kimia')) return 'ph-atom';
+            if (n.includes('sains') || n.includes('ipa') || n.includes('matematika') || n.includes('fisika') || n.includes('kimia') || n.includes('kesehatan')) return 'ph-atom';
             if (n.includes('ekonomi') || n.includes('bisnis') || n.includes('akuntansi') || n.includes('manajemen')) return 'ph-chart-line-up';
-            if (n.includes('sejarah') || n.includes('geografi') || n.includes('ips')) return 'ph-globe-hemisphere-east';
+            if (n.includes('sejarah') || n.includes('geografi') || n.includes('ips') || n.includes('budaya')) return 'ph-globe-hemisphere-east';
+            if (n.includes('biografi') || n.includes('tokoh')) return 'ph-user-focus';
             if (n.includes('seni') || n.includes('desain') || n.includes('kriya') || n.includes('musik') || n.includes('olahraga')) return 'ph-paint-brush-broad';
             if (n.includes('fiksi') || n.includes('novel') || n.includes('sastra') || n.includes('cerita') || n.includes('komik')) return 'ph-sparkle';
             if (n.includes('psikologi') || n.includes('filsafat') || n.includes('pengembangan')) return 'ph-brain';

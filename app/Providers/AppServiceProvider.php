@@ -53,7 +53,7 @@ class AppServiceProvider extends ServiceProvider
                         Artisan::call('migrate', ['--force' => true]);
                     }
 
-                    $seedLock = ($dbPath && $dbPath !== ':memory:') ? (dirname($dbPath).'/koleksi_500_v2.lock') : null;
+                    $seedLock = ($dbPath && $dbPath !== ':memory:') ? (dirname($dbPath).'/koleksi_500_v3.lock') : null;
                     if ($seedLock && ! file_exists($seedLock)) {
                         Artisan::call('db:seed', [
                             '--class' => KoleksiPerpustakaanSeeder::class,

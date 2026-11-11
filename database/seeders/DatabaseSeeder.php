@@ -54,7 +54,10 @@ class DatabaseSeeder extends Seeder
             'Agama' => 'Kajian sejarah, fiqih, dan literatur keagamaan',
             'Hukum dan Politik' => 'Kajian tata negara, hukum perundang-undangan',
             'Resep' => 'Aneka resep masakan nusantara dan internasional',
-            'Lainnya' => 'Kategori bacaan umum dan ensiklopedia',
+            'Sejarah dan Budaya' => 'Kajian sejarah peradaban, kebudayaan daerah, dan kearifan lokal nusantara',
+            'Teknologi dan Desain' => 'Buku arsitektur, desain grafis, interior, dan rekayasa teknologi',
+            'Sains dan Kesehatan' => 'Ilmu pengetahuan alam, kesehatan medis, dan herbal tradisional',
+            'Biografi' => 'Kisah inspiratif tokoh bangsa, ulama besar, dan ilmuwan terkemuka dunia',
         ];
 
         foreach ($kategoriList as $nama => $deskripsi) {
@@ -63,6 +66,8 @@ class DatabaseSeeder extends Seeder
                 ['deskripsi' => $deskripsi]
             );
         }
+
+        Kategori::where('nama_kategori', 'Lainnya')->delete();
 
         $this->call(KoleksiPerpustakaanSeeder::class);
     }
