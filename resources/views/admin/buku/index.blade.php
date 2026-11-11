@@ -418,7 +418,7 @@
                         </th>
                         <th class="py-4 px-6">Buku &amp; Tanggal Terbit</th>
                         <th class="py-4 px-6">Kategori</th>
-                        <th class="py-4 px-6">Stok (Ketik / Klik)</th>
+                        <th class="py-4 px-6">Stok</th>
                         <th class="py-4 px-6">ISBN</th>
                         <th class="py-4 px-6 text-right">Aksi</th>
                     </tr>
