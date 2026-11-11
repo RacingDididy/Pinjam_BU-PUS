@@ -88,7 +88,7 @@ class KoleksiPerpustakaanSeeder extends Seeder
 
         if (! empty($toInsert)) {
             foreach (array_chunk($toInsert, 100) as $chunk) {
-                DB::table('bukus')->insert($chunk);
+                DB::table('bukus')->insertOrIgnore($chunk);
             }
         }
     }

@@ -21,9 +21,19 @@ class PerpustakaanController extends Controller
 
         $activeKategori = null;
         if ($request->filled('kategori')) {
-            $kategoriId = (int) $request->input('kategori');
-            $query->where('kategori_id', $kategoriId);
-            $activeKategori = $kategoris->firstWhere('id', $kategoriId);
+            $rawKategori = $request->input('kategori');
+            if (is_numeric($rawKategori)) {
+                $kategoriId = (int) $rawKategori;
+                $activeKategori = $kategoris->firstWhere('id', $kategoriId);
+                $query->where('kategori_id', $kategoriId);
+            } else {
+                $activeKategori = $kategoris->first(function ($item) use ($rawKategori) {
+                    return strcasecmp($item->nama_kategori, trim((string) $rawKategori)) === 0;
+                });
+                if ($activeKategori) {
+                    $query->where('kategori_id', $activeKategori->id);
+                }
+            }
         }
 
         if ($request->filled('search')) {

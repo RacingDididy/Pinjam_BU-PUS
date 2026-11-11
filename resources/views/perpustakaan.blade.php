@@ -149,7 +149,7 @@
                 <a 
                     href="{{ route('perpustakaan.index', array_filter(['kategori' => $kat->id, 'search' => request('search'), 'sort' => request('sort') !== 'terbaru' ? request('sort') : null])) }}"
                     data-ajax-catalog="1"
-                    class="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-colors {{ (int) request('kategori') === $kat->id ? 'bg-blue-600 text-white font-bold shadow-sm' : 'bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400' }}"
+                    class="shrink-0 px-3.5 py-1.5 rounded-full text-xs transition-colors {{ ($activeKategori && $activeKategori->id === $kat->id) ? 'bg-blue-600 text-white font-bold shadow-sm' : 'bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400 font-medium' }}"
                 >
                     {{ $kat->nama_kategori }}
                 </a>
