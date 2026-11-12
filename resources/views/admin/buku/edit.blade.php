@@ -191,19 +191,19 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <!-- Judul -->
                 <div class="sm:col-span-2">
-                    <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Judul Buku *</label>
+                    <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Judul Buku</label>
                     <input type="text" name="judul" x-model="bookTitle" required value="{{ old('judul', $buku->judul) }}" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none">
                 </div>
 
                 <!-- Pengarang -->
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Pengarang *</label>
+                    <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Pengarang</label>
                     <input type="text" name="pengarang" x-model="bookAuthor" required value="{{ old('pengarang', $buku->pengarang) }}" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none">
                 </div>
 
                 <!-- Penerbit -->
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Penerbit *</label>
+                    <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Penerbit</label>
                     <input type="text" name="penerbit" x-model="bookPublisher" required value="{{ old('penerbit', $buku->penerbit) }}" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none">
                 </div>
 
@@ -212,7 +212,7 @@
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <label class="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                             <i class="ph-bold ph-calendar-blank text-blue-600 text-sm"></i>
-                            <span>Tanggal Terbit (Tanggal, Bulan, Tahun) *</span>
+                            <span>Tanggal Terbit (Tanggal, Bulan, Tahun)</span>
                         </label>
                         <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-[11px] font-bold">
                             <i class="ph-fill ph-check-circle text-xs"></i>
@@ -276,13 +276,13 @@
 
                 <!-- ISBN -->
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">ISBN *</label>
+                    <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">ISBN</label>
                     <input type="text" name="isbn" x-model="bookIsbn" required value="{{ old('isbn', $buku->isbn) }}" class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none font-mono">
                 </div>
 
                 <!-- Jumlah Stok (Dapat Diketik Langsung + Stepper & Quick Chips) -->
                 <div>
-                    <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Jumlah Stok (Ketik / Klik) *</label>
+                    <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5">Jumlah Stok</label>
                     <div class="flex items-center gap-1.5">
                         <div class="flex-1 flex items-center rounded-xl border border-slate-200 bg-white p-0.5 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
                             <button
@@ -322,7 +322,7 @@
                         <div>
                             <label class="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                                 <i class="ph-bold ph-squares-four text-blue-600 text-sm"></i>
-                                <span>Pilih Kategori Koleksi *</span>
+                                <span>Pilih Kategori Koleksi</span>
                             </label>
                             <p class="text-[11px] text-slate-500 mt-0.5">
                                 Klik kartu kategori di bawah (Terpilih: <strong class="text-blue-600" x-text="selectedKategoriName"></strong>)
