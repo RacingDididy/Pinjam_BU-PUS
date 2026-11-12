@@ -206,4 +206,34 @@ class HomeTest extends TestCase
         $this->assertEquals($imageUrl, $buku->cover_image);
         $this->assertEquals($imageUrl, $buku->cover_url);
     }
+
+    public function test_registration_issues_email_verification_link_without_numeric_otp(): void
+    {
+        $response = $this->postJson('/register', [
+            'email' => 'siswa.baru@gmail.com',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'step' => 'waiting_verification',
+            'email' => 'siswa.baru@gmail.com',
+        ]);
+        $response->assertJsonMissing(['verification_code' => true]);
+
+        $user = User::where('email', 'siswa.baru@gmail.com')->first();
+        $this->assertNotNull($user);
+        $this->assertFalse($user->isEmailVerified());
+        $this->assertNotEmpty($user->verification_code);
+
+        // Verifikasi melalui tautan email
+        $verifyResponse = $this->get(route('verification.link', [
+            'id' => $user->id,
+            'token' => $user->verification_code,
+        ]));
+
+        $verifyResponse->assertRedirect(route('home', ['setup_password' => 1]));
+        $this->assertTrue($user->fresh()->isEmailVerified());
+        $this->assertAuthenticatedAs($user);
+    }
 }

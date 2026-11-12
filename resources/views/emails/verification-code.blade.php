@@ -21,18 +21,11 @@
             <td style="padding:24px 28px 12px 28px;font-size:14px;line-height:1.65;color:#334155;">
                 Halo <strong>{{ $user->name ?: $user->email }}</strong>,<br><br>
                 Kami menerima permintaan pendaftaran / verifikasi akun pembaca perpustakaan menggunakan alamat email <strong>{{ $user->email }}</strong>.<br><br>
-                Gunakan <strong>6 digit kode verifikasi</strong> di bawah ini pada halaman pendaftaran, atau tekan tombol konfirmasi:
+                Silakan konfirmasi alamat email Anda dengan menekan tombol di bawah ini agar Anda dapat membuat kata sandi akun:
             </td>
         </tr>
         <tr>
-            <td style="padding:8px 28px 16px 28px;text-align:center;">
-                <div style="display:inline-block;background-color:#eff6ff;border:2px dashed #3b82f6;color:#1d4ed8;font-size:28px;font-weight:800;letter-spacing:8px;padding:14px 28px;border-radius:12px;font-family:monospace;">
-                    {{ $code }}
-                </div>
-            </td>
-        </tr>
-        <tr>
-            <td style="padding:8px 28px 20px 28px;text-align:center;">
+            <td style="padding:12px 28px 20px 28px;text-align:left;">
                 <a href="{{ $verificationUrl }}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px;">
                     Konfirmasi Email Saya
                 </a>
