@@ -1,6 +1,6 @@
 [package]
 name = "bandul/pinjam-bu-pus"
-version = "0.1.9"
+version = "0.1.10"
 description = "Sistem Informasi Peminjaman Buku Perpustakaan SMK Negeri 5 Surakarta"
 private = true
 
