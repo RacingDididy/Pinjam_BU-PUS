@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pusat Unduhan Diagram Sistem - PINJAM BU-PUS (SMK Negeri 5 Surakarta)</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Mermaid.js -->
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        .diagram-container svg {
+            max-width: 100% !important;
+            height: auto !important;
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col font-sans">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="/" class="flex items-center gap-2.5 group">
+                    <div class="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shadow-sm group-hover:scale-105 transition-transform">
+                        BP
+                    </div>
+                    <div>
+                        <span class="font-extrabold text-slate-900 text-sm tracking-tight block">PINJAM <span class="text-blue-600">BU-PUS</span></span>
+                        <span class="text-[10px] text-slate-500 font-semibold block -mt-0.5">SMK Negeri 5 Surakarta</span>
+                    </div>
+                </a>
+                <span class="h-5 w-px bg-slate-200 hidden sm:block"></span>
+                <span class="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full hidden sm:inline-flex items-center gap-1.5">
+                    <i class="ph-bold ph-chart-polar text-blue-600"></i>
+                    Pusat Diagram &amp; Visualisasi LKM
+                </span>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <a href="/" class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-blue-600 hover:bg-slate-100 transition-colors inline-flex items-center gap-1.5">
+                    <i class="ph-bold ph-arrow-left"></i>
+                    <span>Kembali ke Web</span>
+                </a>
+                <a href="/perpustakaan" class="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors inline-flex items-center gap-1.5">
+                    <i class="ph-bold ph-books"></i>
+                    <span>Katalog Buku</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+
+        <!-- Banner Info -->
+        <div class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+            <div class="relative z-10 max-w-3xl space-y-2.5">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-blue-200 text-xs font-extrabold">
+                    <i class="ph-fill ph-check-circle text-emerald-400"></i>
+                    Dokumentasi Rekayasa Perangkat Lunak (RPL)
+                </div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                    Pusat Unduhan Diagram Sistem PINJAM BU-PUS
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                    Unduh langsung gambar visual resolusi tinggi (<strong>PNG HD</strong> dan <strong>SVG Vektor</strong>) untuk kebutuhan Lembar Kerja Mandiri (LKM), laporan proyek, atau media infografik Canva.
+                </p>
+            </div>
+            <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
+            <button 
+                type="button" 
+                onclick="switchTab('flowchart')" 
+                id="tab-btn-flowchart"
+                class="tab-btn shrink-0 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 bg-blue-600 text-white shadow-sm"
+            >
+                <i class="ph-bold ph-git-branch text-base"></i>
+                <span>2.2.1 Flowchart Alur Transaksi</span>
+            </button>
+            <button 
+                type="button" 
+                onclick="switchTab('usecase')" 
+                id="tab-btn-usecase"
+                class="tab-btn shrink-0 px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all flex items-center gap-2"
+            >
+                <i class="ph-bold ph-users-three text-base"></i>
+                <span>2.2.2 Use Case Diagram</span>
+            </button>
+            <button 
+                type="button" 
+                onclick="switchTab('erd')" 
+                id="tab-btn-erd"
+                class="tab-btn shrink-0 px-4 py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all flex items-center gap-2"
+            >
+                <i class="ph-bold ph-database text-base"></i>
+                <span>2.3.1 Entity Relationship Diagram (ERD)</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: FLOWCHART -->
+        <section id="panel-flowchart" class="diagram-panel space-y-4">
+            <!-- Action Bar -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-bold text-[10px] uppercase">Diagram Alir</span>
+                        <h2 class="text-base sm:text-lg font-extrabold text-slate-900">2.2.1 Flowchart Alur Transaksi Utama</h2>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Siklus pendaftaran, verifikasi kode OTP, pengajuan pinjam, verifikasi fisik pustakawan, dan pengembalian buku.
+                    </p>
+                </div>
+
+                <!-- Download Buttons -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <button 
+                        type="button" 
+                        onclick="downloadPng('flowchart-container', '2.2.1-flowchart-transaksi-pinjam-bupus.png')"
+                        class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all hover:scale-[1.02]"
+                    >
+                        <i class="ph-bold ph-download-simple text-sm"></i>
+                        <span>Unduh Gambar PNG (HD)</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        onclick="downloadSvg('flowchart-container', '2.2.1-flowchart-transaksi-pinjam-bupus.svg')"
+                        class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all hover:scale-[1.02]"
+                    >
+                        <i class="ph-bold ph-file-svg text-sm"></i>
+                        <span>Unduh Vektor SVG</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        onclick="copyImageToClipboard('flowchart-container')"
+                        class="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs inline-flex items-center gap-1 transition-colors"
+                        title="Salin Gambar ke Clipboard (Bisa langsung Paste ke Canva/Word)"
+                    >
+                        <i class="ph-bold ph-copy text-sm"></i>
+                        <span class="hidden sm:inline">Salin Gambar</span>
+                    </button>
+                    <div class="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
+                    <div class="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-white">
+                        <button type="button" onclick="zoomDiagram('flowchart-container', 1.2)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-700 font-bold text-sm" title="Zoom In">+</button>
+                        <button type="button" onclick="zoomDiagram('flowchart-container', 0.8)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-700 font-bold text-sm border-l border-slate-200" title="Zoom Out">-</button>
+                        <button type="button" onclick="resetZoom('flowchart-container')" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-700 font-bold text-xs border-l border-slate-200" title="Reset">↺</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canvas Diagram Viewer -->
+            <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-sm overflow-auto text-center relative">
+                <div id="flowchart-container" class="diagram-container inline-block transition-transform duration-200 origin-top">
+                    <div class="mermaid">
+flowchart TD
+    Start(["Mulai"]) --> A1["Siswa Mengakses Aplikasi PINJAM BU-PUS"]
+    A1 --> A2{"Sudah Punya Akun?"}
+
+    A2 -- "Belum" --> B1["Isi Form Pendaftaran (Nama, Email, NISN, Kelas, Password)"]
+    B1 --> B2["Sistem Mengirimkan Kode OTP 6-Digit via Email"]
+    B2 --> B3["Input Kode OTP 6-Digit pada Modal Verifikasi"]
+    B3 --> B4{"Kode OTP Valid?"}
+    B4 -- "Tidak" --> B5["Tampilkan Notifikasi Error & Opsi Kirim Ulang OTP"]
+    B5 --> B3
+    B4 -- "Ya" --> B6["Akun Terverifikasi Aktif & Auto-Login"]
+
+    A2 -- "Sudah" --> C1["Siswa Login Akun (Email & Password)"]
+    C1 --> C2{"Kredensial Valid?"}
+    C2 -- "Tidak" --> C3["Tampilkan Pesan Gagal Login"]
+    C3 --> C1
+    C2 -- "Ya" --> B6
+
+    B6 --> D1["Jelajahi Katalog Perpustakaan (Kategori & Pencarian)"]
+    D1 --> D2["Pilih Buku & Cek Ketersediaan Stok Fisik"]
+    D2 --> D3{"Stok Buku Tersedia (> 0)?"}
+    D3 -- "Kosong" --> D4["Buku Disimpan ke Wishlist / Pilih Judul Lain"]
+    D4 --> D1
+    D3 -- "Ada" --> E1["Masukkan ke Keranjang Pinjam / Klik Pinjam Langsung"]
+
+    E1 --> E2["Buka Halaman Checkout Peminjaman"]
+    E2 --> E3["Input Jumlah Eksemplar, Keperluan, & Catatan"]
+    E3 --> E4["Kirim Pengajuan Peminjaman (Status: Menunggu Approval)"]
+
+    E4 --> F1["Pustakawan Menerima Pengajuan di Tab 'Menunggu Approval'"]
+    F1 --> F2["Pustakawan Memverifikasi Data Siswa & Fisik Buku"]
+    F2 --> F3{"Disetujui Pustakawan?"}
+    
+    F3 -- "Ditolak" --> G1["Pustakawan Menginput Alasan Penolakan"]
+    G1 --> G2["Status Diubah: Ditolak (Stok Tidak Berkurang)"]
+    G2 --> EndDitolak(["Transaksi Selesai - Ditolak"])
+
+    F3 -- "Disetujui" --> H1["Pustakawan Klik 'Terima Pengajuan'"]
+    H1 --> H2["Sistem Mengurangi Stok Buku Otomatis"]
+    H2 --> H3["Status Diubah: Dipinjam (Kode TRX & Tanggal Tenggat Aktif)"]
+    H3 --> H4["Siswa Mengambil Buku Fisik di Meja Sirkulasi Perpustakaan"]
+
+    H4 --> I1["Siswa Membaca Buku Selama Masa Pinjam (Maks 7 Hari)"]
+    I1 --> I2["Siswa Menyerahkan Kembali Buku Fisik ke Perpustakaan"]
+    I2 --> J1["Pustakawan Mengecek Kondisi Buku & Tanggal Pengembalian"]
+    J1 --> J2{"Lewat dari Tenggat Waktu?"}
+    
+    J2 -- "Ya" --> K1["Sistem Menghitung Denda Keterlambatan (Rp 1.000 / Hari)"]
+    K1 --> K2["Siswa Menyelesaikan Pembayaran Denda di Tempat"]
+    K2 --> L1["Pustakawan Klik 'Konfirmasi Pengembalian'"]
+
+    J2 -- "Tepat Waktu" --> L1
+
+    L1 --> M1["Status Diubah: Selesai & Stok Buku Bertambah Kembali"]
+    M1 --> M2["Siswa Memberikan Bintang (1-5) & Ulasan Buku"]
+    M2 --> Finish(["Selesai - Transaksi Berhasil"])
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: USE CASE DIAGRAM -->
+        <section id="panel-usecase" class="diagram-panel space-y-4 hidden">
+            <!-- Action Bar -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase">Diagram Peran</span>
+                        <h2 class="text-base sm:text-lg font-extrabold text-slate-900">2.2.2 Use Case Diagram &amp; Pemisahan Peran</h2>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Pemisahan wewenang antara Siswa (Peminjam), Pustakawan (Sirkulasi &amp; Laporan), dan Administrator (Keamanan &amp; Backup).
+                    </p>
+                </div>
+
+                <!-- Download Buttons -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <button 
+                        type="button" 
+                        onclick="downloadPng('usecase-container', '2.2.2-usecase-diagram-pinjam-bupus.png')"
+                        class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all hover:scale-[1.02]"
+                    >
+                        <i class="ph-bold ph-download-simple text-sm"></i>
+                        <span>Unduh Gambar PNG (HD)</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        onclick="downloadSvg('usecase-container', '2.2.2-usecase-diagram-pinjam-bupus.svg')"
+                        class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all hover:scale-[1.02]"
+                    >
+                        <i class="ph-bold ph-file-svg text-sm"></i>
+                        <span>Unduh Vektor SVG</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        onclick="copyImageToClipboard('usecase-container')"
+                        class="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs inline-flex items-center gap-1 transition-colors"
+                        title="Salin Gambar ke Clipboard"
+                    >
+                        <i class="ph-bold ph-copy text-sm"></i>
+                        <span class="hidden sm:inline">Salin Gambar</span>
+                    </button>
+                    <div class="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
+                    <div class="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-white">
+                        <button type="button" onclick="zoomDiagram('usecase-container', 1.2)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-700 font-bold text-sm" title="Zoom In">+</button>
+                        <button type="button" onclick="zoomDiagram('usecase-container', 0.8)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-700 font-bold text-sm border-l border-slate-200" title="Zoom Out">-</button>
+                        <button type="button" onclick="resetZoom('usecase-container')" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-700 font-bold text-xs border-l border-slate-200" title="Reset">↺</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canvas Diagram Viewer -->
+            <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-sm overflow-auto text-center relative">
+                <div id="usecase-container" class="diagram-container inline-block transition-transform duration-200 origin-top">
+                    <div class="mermaid">
+flowchart LR
+    subgraph Aktor ["Aktor Pengguna"]
+        Siswa["👤 Siswa / Warga Sekolah<br/>(Peminjam)"]
+        Pustakawan["📚 Petugas Pustakawan<br/>(Pengelola Sirkulasi)"]
+        Admin["🛡️ Administrator Sistem<br/>(Otoritas Keamanan)"]
+    end
+
+    subgraph Sistem ["SISTEM INFORMASI PINJAM BU-PUS (SMK NEGERI 5 SURAKARTA)"]
+        subgraph Modul_Siswa ["Modul Siswa & Pengunjung"]
+            UC1["UC-01: Registrasi & Verifikasi OTP"]
+            UC2["UC-02: Login Akun & Kelola Profil"]
+            UC3["UC-03: Pencarian & Filter Kategori Buku"]
+            UC4["UC-04: Tambah ke Wishlist & Keranjang"]
+            UC5["UC-05: Pengajuan Peminjaman Buku (Checkout)"]
+            UC6["UC-06: Monitoring Riwayat & Status Transaksi"]
+            UC7["UC-07: Memberi Rating Bintang & Ulasan Buku"]
+        end
+
+        subgraph Modul_Pustakawan ["Modul Manajemen Perpustakaan & Sirkulasi"]
+            UC8["UC-08: Manajemen Koleksi Buku (CRUD & Stok)"]
+            UC9["UC-09: Manajemen Kategori Koleksi"]
+            UC10["UC-10: Verifikasi & Approval Pengajuan Pinjam"]
+            UC11["UC-11: Konfirmasi Pengembalian & Denda"]
+            UC12["UC-12: Ekspor Laporan Excel (.xlsx Data Jadi & Raw)"]
+            UC13["UC-13: Monitoring Statistik Sirkulasi Dashboard"]
+        end
+
+        subgraph Modul_Admin ["Modul Administrasi & Keamanan"]
+            UC14["UC-14: Manajemen Pengguna (Siswa & Pustakawan)"]
+            UC15["UC-15: Pengaturan Akses & Blokir/Aktivasi Akun"]
+            UC16["UC-16: Audit Log Aktivitas Keamanan & Sesi"]
+            UC17["UC-17: Unduh Backup Data Sistem (JSON)"]
+            UC18["UC-18: Manajemen Agenda & Tugas Tim (Admin Tasks)"]
+        end
+    end
+
+    Siswa --> UC1
+    Siswa --> UC2
+    Siswa --> UC3
+    Siswa --> UC4
+    Siswa --> UC5
+    Siswa --> UC6
+    Siswa --> UC7
+
+    Pustakawan --> UC2
+    Pustakawan --> UC3
+    Pustakawan --> UC8
+    Pustakawan --> UC9
+    Pustakawan --> UC10
+    Pustakawan --> UC11
+    Pustakawan --> UC12
+    Pustakawan --> UC13
+
+    Admin --> UC2
+    Admin --> UC14
+    Admin --> UC15
+    Admin --> UC16
+    Admin --> UC17
+    Admin --> UC18
+    Admin -.->|Mewarisi Hak Akses| Pustakawan
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: ERD DIAGRAM -->
+        <section id="panel-erd" class="diagram-panel space-y-4 hidden">
+            <!-- Action Bar -->
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold text-[10px] uppercase">Struktur Basis Data</span>
+                        <h2 class="text-base sm:text-lg font-extrabold text-slate-900">2.3.1 Entity Relationship Diagram (ERD)</h2>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">
+                        Relasi tabel Users, Kategoris, Bukus, Peminjamans, Ratings, Wishlists, dan Admin Tasks.
+                    </p>
+                </div>
+
+                <!-- Download Buttons -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <button 
+                        type="button" 
+                        onclick="downloadPng('erd-container', '2.3.1-erd-database-pinjam-bupus.png')"
+                        class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all hover:scale-[1.02]"
+                    >
+                        <i class="ph-bold ph-download-simple text-sm"></i>
+                        <span>Unduh Gambar PNG (HD)</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        onclick="downloadSvg('erd-container', '2.3.1-erd-database-pinjam-bupus.svg')"
+                        class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm transition-all hover:scale-[1.02]"
+                    >
+                        <i class="ph-bold ph-file-svg text-sm"></i>
+                        <span>Unduh Vektor SVG</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        onclick="copyImageToClipboard('erd-container')"
+                        class="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs inline-flex items-center gap-1 transition-colors"
+                        title="Salin Gambar ke Clipboard"
+                    >
+                        <i class="ph-bold ph-copy text-sm"></i>
+                        <span class="hidden sm:inline">Salin Gambar</span>
+                    </button>
+                    <div class="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
+                    <div class="flex items-center border border-slate-200 rounded-xl overflow-hidden bg-white">
+                        <button type="button" onclick="zoomDiagram('erd-container', 1.2)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-700 font-bold text-sm" title="Zoom In">+</button>
+                        <button type="button" onclick="zoomDiagram('erd-container', 0.8)" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-700 font-bold text-sm border-l border-slate-200" title="Zoom Out">-</button>
+                        <button type="button" onclick="resetZoom('erd-container')" class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 text-slate-700 font-bold text-xs border-l border-slate-200" title="Reset">↺</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Canvas Diagram Viewer -->
+            <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-sm overflow-auto text-center relative">
+                <div id="erd-container" class="diagram-container inline-block transition-transform duration-200 origin-top">
+                    <div class="mermaid">
+erDiagram
+    USERS ||--o{ PEMINJAMANS : "mengajukan"
+    USERS ||--o{ PEMINJAMANS : "disetujui_oleh"
+    USERS ||--o{ RATINGS : "menulis"
+    USERS ||--o{ WISHLISTS : "menyimpan"
+    USERS ||--o{ ADMIN_TASKS : "membuat"
+
+    KATEGORIS ||--o{ BUKUS : "mengelompokkan"
+    BUKUS ||--o{ PEMINJAMANS : "dipinjam_dalam"
+    BUKUS ||--o{ RATINGS : "memiliki"
+    BUKUS ||--o{ WISHLISTS : "dimasukkan_ke"
+
+    USERS {
+        bigint id PK
+        string name
+        string username UK
+        string email UK
+        string password
+        string role
+        string nisn
+        string nama_kelas
+        string no_whatsapp
+        string verification_code
+        boolean is_active
+    }
+
+    KATEGORIS {
+        bigint id PK
+        string nama_kategori UK
+        string deskripsi
+    }
+
+    BUKUS {
+        bigint id PK
+        bigint kategori_id FK
+        string judul
+        string pengarang
+        string penerbit
+        date tanggal_terbit
+        string isbn UK
+        integer stok
+        string cover_image
+        text sinopsis
+        integer tebal_halaman
+    }
+
+    PEMINJAMANS {
+        bigint id PK
+        string kode_transaksi UK
+        bigint buku_id FK
+        bigint user_id FK
+        string nama_peminjam
+        integer jumlah
+        date tanggal_pinjam
+        date tenggat_kembali
+        date tanggal_kembali
+        string status
+        bigint approved_by FK
+    }
+
+    RATINGS {
+        bigint id PK
+        bigint buku_id FK
+        bigint user_id FK
+        tinyint bintang
+        text ulasan
+    }
+
+    WISHLISTS {
+        bigint id PK
+        bigint user_id FK
+        bigint buku_id FK
+    }
+
+    ADMIN_TASKS {
+        bigint id PK
+        bigint created_by FK
+        string judul
+        string kategori_tugas
+        tinyint progres
+        boolean is_completed
+    }
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
+        &copy; 2026 PINJAM BU-PUS &bull; Perpustakaan SMK Negeri 5 Surakarta. Seluruh diagram siap diunduh untuk dokumentasi teknis LKM &amp; infografik.
+    </footer>
+
+    <!-- Script Renderer & Exporter -->
+    <script>
+        // Inisialisasi Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            fontFamily: '"Plus Jakarta Sans", sans-serif',
+            fontSize: 13,
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+
+        // Tab Switcher
+        function switchTab(tabKey) {
+            document.querySelectorAll('.diagram-panel').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('bg-blue-600', 'text-white', 'shadow-sm');
+                b.classList.add('text-slate-600');
+            });
+
+            const panel = document.getElementById(`panel-${tabKey}`);
+            const btn = document.getElementById(`tab-btn-${tabKey}`);
+            if (panel && btn) {
+                panel.classList.remove('hidden');
+                btn.classList.add('bg-blue-600', 'text-white', 'shadow-sm');
+                btn.classList.remove('text-slate-600');
+            }
+        }
+
+        // Zoom Controls
+        const zoomLevels = {};
+        function zoomDiagram(containerId, factor) {
+            zoomLevels[containerId] = (zoomLevels[containerId] || 1) * factor;
+            zoomLevels[containerId] = Math.min(Math.max(zoomLevels[containerId], 0.4), 3.0);
+            applyZoom(containerId);
+        }
+        function resetZoom(containerId) {
+            zoomLevels[containerId] = 1;
+            applyZoom(containerId);
+        }
+        function applyZoom(containerId) {
+            const el = document.getElementById(containerId);
+            if (el) {
+                el.style.transform = `scale(${zoomLevels[containerId] || 1})`;
+            }
+        }
+
+        // SVG Exporter (Download Vector)
+        function downloadSvg(containerId, filename) {
+            const container = document.getElementById(containerId);
+            const svg = container ? container.querySelector('svg') : null;
+            if (!svg) {
+                alert('Diagram sedang dimuat, silakan coba sesaat lagi.');
+                return;
+            }
+
+            const clone = svg.cloneNode(true);
+            clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            clone.style.backgroundColor = '#ffffff';
+
+            const svgData = new XMLSerializer().serializeToString(clone);
+            const blob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename || 'diagram.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // PNG Exporter (High-Resolution 2x / 300 DPI)
+        function downloadPng(containerId, filename, scale = 2.5) {
+            const container = document.getElementById(containerId);
+            const svg = container ? container.querySelector('svg') : null;
+            if (!svg) {
+                alert('Diagram sedang dimuat, silakan coba sesaat lagi.');
+                return;
+            }
+
+            const clone = svg.cloneNode(true);
+            clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            clone.style.backgroundColor = '#ffffff';
+
+            // Dapatkan dimensi viewBox atau bounding box
+            const viewBox = svg.viewBox.baseVal;
+            const bbox = svg.getBoundingClientRect();
+            const originalWidth = viewBox && viewBox.width > 0 ? viewBox.width : bbox.width || 1200;
+            const originalHeight = viewBox && viewBox.height > 0 ? viewBox.height : bbox.height || 800;
+
+            const padding = 40;
+            const targetWidth = (originalWidth + padding * 2) * scale;
+            const targetHeight = (originalHeight + padding * 2) * scale;
+
+            const svgString = new XMLSerializer().serializeToString(clone);
+            const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+                const ctx = canvas.getContext('2d');
+
+                // Latar belakang putih bersih
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+                // Render gambar di tengah dengan skala tinggi
+                ctx.drawImage(img, padding * scale, padding * scale, originalWidth * scale, originalHeight * scale);
+
+                canvas.toBlob(function(blob) {
+                    const pngUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = pngUrl;
+                    a.download = filename || 'diagram.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(pngUrl);
+                    URL.revokeObjectURL(url);
+                }, 'image/png');
+            };
+            img.onerror = function() {
+                alert('Gagal mengekspor gambar ke PNG. Anda dapat menggunakan opsi Unduh Vektor SVG.');
+            };
+            img.src = url;
+        }
+
+        // Copy PNG to Clipboard
+        async function copyImageToClipboard(containerId) {
+            const container = document.getElementById(containerId);
+            const svg = container ? container.querySelector('svg') : null;
+            if (!svg) return;
+
+            try {
+                const clone = svg.cloneNode(true);
+                clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                const viewBox = svg.viewBox.baseVal;
+                const bbox = svg.getBoundingClientRect();
+                const w = (viewBox && viewBox.width > 0 ? viewBox.width : bbox.width || 1200) * 2;
+                const h = (viewBox && viewBox.height > 0 ? viewBox.height : bbox.height || 800) * 2;
+
+                const svgString = new XMLSerializer().serializeToString(clone);
+                const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+
+                const img = new Image();
+                img.onload = async function() {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, w, h);
+                    ctx.drawImage(img, 0, 0, w, h);
+
+                    canvas.toBlob(async function(pngBlob) {
+                        if (navigator.clipboard && navigator.clipboard.write) {
+                            try {
+                                await navigator.clipboard.write([
+                                    new ClipboardItem({ 'image/png': pngBlob })
+                                ]);
+                                alert('Gambar berhasil disalin ke Clipboard! Anda bisa langsung menempelkannya (Ctrl+V) di Canva atau Word.');
+                            } catch (e) {
+                                alert('Peramban Anda membatasi akses salin clipboard. Silakan gunakan tombol "Unduh Gambar PNG".');
+                            }
+                        }
+                    }, 'image/png');
+                };
+                img.src = url;
+            } catch (err) {
+                console.error(err);
+            }
+        }
+    </script>
+</body>
+</html>

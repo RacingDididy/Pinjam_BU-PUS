@@ -1514,6 +1514,7 @@
                     <ul class="space-y-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                         <li><a href="{{ route('informasi.aturan-peminjaman') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{{ __('Aturan Peminjaman (7 Hari)') }}</a></li>
                         <li><a href="{{ route('informasi.panduan-pengembalian') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{{ __('Panduan Pengembalian Buku') }}</a></li>
+                        <li><a href="{{ route('diagrams.index') }}" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-bold text-blue-600 dark:text-blue-400 inline-flex items-center gap-1.5"><i class="ph-bold ph-chart-polar"></i><span>{{ __('Pusat Diagram & Visual LKM') }}</span></a></li>
                     </ul>
                 </div>
 

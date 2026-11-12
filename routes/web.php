@@ -27,6 +27,9 @@ Route::get('/media/covers/{filename}', function (string $filename) {
 Route::get('/locale/{locale}', [HomeController::class, 'switchLocale'])->name('locale.switch');
 Route::get('/informasi/aturan-peminjaman', [HomeController::class, 'aturanPeminjaman'])->name('informasi.aturan-peminjaman');
 Route::get('/informasi/panduan-pengembalian', [HomeController::class, 'panduanPengembalian'])->name('informasi.panduan-pengembalian');
+Route::get('/diagrams', function () {
+    return response()->file(public_path('diagrams/index.html'));
+})->name('diagrams.index');
 
 // Katalog perpustakaan
 Route::get('/perpustakaan', [PerpustakaanController::class, 'index'])->name('perpustakaan.index');
