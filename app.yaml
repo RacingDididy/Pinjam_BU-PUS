@@ -1,17 +1,14 @@
 kind: wasmer.io/App.v0
 name: pinjam-bu-pus
+app_id: da_RrWI0t5Uj00G
 owner: bandul
 package: .
-debug: false
-volumes:
-  - name: storage
-    mount: /data
 env:
-  APP_NAME: "PINJAM BU-PUS"
+  APP_NAME: PINJAM BU-PUS
   APP_ENV: production
-  APP_DEBUG: "false"
-  APP_URL: "https://pinjam-bu-pus.wasmer.app"
-  APP_KEY: "base64:8xJ9vK2mN5pQ7rT0wY3zA6bC9dE2fG5hI8jK1lM4nO8="
+  APP_DEBUG: 'false'
+  APP_URL: https://pinjam-bu-pus.wasmer.app
+  APP_KEY: base64:8xJ9vK2mN5pQ7rT0wY3zA6bC9dE2fG5hI8jK1lM4nO8=
   APP_LOCALE: id
   APP_FALLBACK_LOCALE: id
   DB_CONNECTION: sqlite
@@ -22,10 +19,36 @@ env:
   LOG_CHANNEL: stderr
   MAIL_MAILER: smtp
   MAIL_HOST: smtp.gmail.com
-  MAIL_PORT: "587"
+  MAIL_PORT: '587'
   MAIL_USERNAME: albanisetiawan52@gmail.com
   MAIL_PASSWORD: vlzgamfyykapymjp
   MAIL_ENCRYPTION: tls
   MAIL_FROM_ADDRESS: albanisetiawan52@gmail.com
-  MAIL_FROM_NAME: "Perpustakaan SMKN 5 Surakarta"
-app_id: da_RrWI0t5Uj00G
+  MAIL_FROM_NAME: Perpustakaan SMKN 5 Surakarta
+volumes:
+- name: storage
+  mount: /data
+debug: false
+jobs:
+- name: after_deploy
+  trigger: post-deployment
+  action:
+    execute:
+      command: after_deploy
+annotations:
+  anybuild.run/config:
+    composer_build_script: post-update-cmd
+    composer_enable: true
+    name: out
+    node_build_command: npm run build
+    node_install_inputs:
+    - package.json
+    node_package_manager: npm
+    npm_version: '11'
+    php_framework: laravel
+    php_public_dir: public
+    phpix: true
+  anybuild.run/provider: laravel
+  anybuild.run/version: 0.33.3
+  wasmer.io/version: 7.5.0
+enable_email: true
