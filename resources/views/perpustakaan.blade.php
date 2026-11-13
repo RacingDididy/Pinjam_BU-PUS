@@ -85,7 +85,7 @@
         @if($activeKategori)
             <i class="ph-bold ph-caret-right text-[10px] text-slate-400 shrink-0" aria-hidden="true"></i>
             <span class="px-3 py-1.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 font-bold shrink-0">
-                {{ $activeKategori->nama_kategori }}
+                {{ $activeKategori->localized_name }}
             </span>
         @endif
     </nav>
@@ -98,7 +98,7 @@
             </span>
             <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                 @if($activeKategori)
-                    {{ $activeKategori->nama_kategori }}
+                    {{ $activeKategori->localized_name }}
                 @else
                     {{ __('Perpustakaan Buku') }}
                 @endif
@@ -151,7 +151,7 @@
                     data-ajax-catalog="1"
                     class="shrink-0 px-3.5 py-1.5 rounded-full text-xs transition-colors {{ ($activeKategori && $activeKategori->id === $kat->id) ? 'bg-blue-600 text-white font-bold shadow-sm' : 'bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-400 font-medium' }}"
                 >
-                    {{ $kat->nama_kategori }}
+                    {{ $kat->localized_name }}
                 </a>
             @endforeach
         </div>

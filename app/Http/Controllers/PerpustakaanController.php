@@ -28,7 +28,10 @@ class PerpustakaanController extends Controller
                 $query->where('kategori_id', $kategoriId);
             } else {
                 $activeKategori = $kategoris->first(function ($item) use ($rawKategori) {
-                    return strcasecmp($item->nama_kategori, trim((string) $rawKategori)) === 0;
+                    $target = trim((string) $rawKategori);
+
+                    return strcasecmp($item->nama_kategori, $target) === 0
+                        || strcasecmp($item->localized_name, $target) === 0;
                 });
                 if ($activeKategori) {
                     $query->where('kategori_id', $activeKategori->id);

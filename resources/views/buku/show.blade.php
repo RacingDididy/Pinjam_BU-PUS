@@ -160,7 +160,7 @@
                 href="{{ route('perpustakaan.index', ['kategori' => $buku->kategori_id]) }}"
                 class="px-3 py-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 font-semibold shrink-0 transition-colors"
             >
-                {{ $buku->kategori->nama_kategori }}
+                {{ $buku->kategori->localized_name }}
             </a>
         @endif
         <i class="ph-bold ph-caret-right text-[10px] text-slate-400 shrink-0" aria-hidden="true"></i>
@@ -256,7 +256,7 @@
                         @if($buku->kategori)
                             <a href="{{ route('perpustakaan.index', ['kategori' => $buku->kategori_id]) }}" class="inline-flex items-center gap-1.5 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                                 <i class="ph-bold ph-tag text-slate-400" aria-hidden="true"></i>
-                                <span>{{ $buku->kategori->nama_kategori }}</span>
+                                <span>{{ $buku->kategori->localized_name }}</span>
                             </a>
                         @endif
                         <span class="inline-flex items-center gap-1.5">
@@ -494,7 +494,7 @@
                             </div>
                             <div class="p-3 sm:p-3.5">
                                 <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 block mb-0.5">{{ __('GENRE') }}</span>
-                                <span class="font-bold text-slate-800 dark:text-slate-100 text-xs sm:text-sm truncate block">{{ $buku->kategori->nama_kategori ?? 'Umum' }}</span>
+                                <span class="font-bold text-slate-800 dark:text-slate-100 text-xs sm:text-sm truncate block">{{ $buku->kategori?->localized_name ?? __('Umum') }}</span>
                             </div>
                         </div>
 
@@ -762,7 +762,7 @@
         <section class="space-y-4">
             <div class="flex items-center justify-between gap-3">
                 <h2 class="text-base sm:text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                    {{ __('Buku Serupa di Kategori') }} {{ $buku->kategori->nama_kategori ?? '' }}
+                    {{ __('Buku Serupa di Kategori') }} {{ $buku->kategori?->localized_name ?? '' }}
                 </h2>
                 <a href="{{ route('perpustakaan.index', ['kategori' => $buku->kategori_id]) }}" class="text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1">
                     <span>{{ __('Lihat semua') }}</span>

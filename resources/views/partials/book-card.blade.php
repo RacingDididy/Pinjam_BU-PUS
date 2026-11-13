@@ -56,7 +56,7 @@
                 href="{{ route('perpustakaan.index', ['kategori' => $book->kategori_id]) }}"
                 class="absolute top-2 left-2 max-w-[68%] truncate px-2 py-0.5 rounded-full bg-blue-600/95 hover:bg-blue-700 text-white text-[10px] font-bold shadow-sm transition-colors"
             >
-                {{ $book->kategori->nama_kategori ?? 'Umum' }}
+                {{ $book->kategori?->localized_name ?? __('Umum') }}
             </a>
 
             <!-- Top-Right Wishlist Button -->

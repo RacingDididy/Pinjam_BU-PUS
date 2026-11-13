@@ -236,4 +236,20 @@ class HomeTest extends TestCase
         $this->assertTrue($user->fresh()->isEmailVerified());
         $this->assertAuthenticatedAs($user);
     }
+
+    public function test_category_names_translate_when_locale_is_english(): void
+    {
+        Kategori::create(['nama_kategori' => 'Teknologi dan Desain', 'deskripsi' => 'Tech & Design']);
+        Kategori::create(['nama_kategori' => 'Hukum dan Politik', 'deskripsi' => 'Law & Politics']);
+        Kategori::create(['nama_kategori' => 'Pelajaran', 'deskripsi' => 'Textbooks']);
+
+        $response = $this->withSession(['locale' => 'en'])->get('/perpustakaan');
+
+        $response->assertStatus(200);
+        $response->assertSee('Technology &amp; Design', false);
+        $response->assertSee('Law &amp; Politics', false);
+        $response->assertSee('Textbooks');
+        $response->assertDontSee('Teknologi dan Desain');
+        $response->assertDontSee('Hukum dan Politik');
+    }
 }

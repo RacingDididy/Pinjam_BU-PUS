@@ -86,7 +86,7 @@
                             href="{{ route('perpustakaan.index', ['kategori' => $kat->id]) }}"
                             class="shrink-0 px-3.5 py-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/70 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 text-slate-700 dark:text-slate-300 text-xs font-medium transition-colors"
                         >
-                            {{ $kat->nama_kategori }}
+                            {{ $kat->localized_name }}
                         </a>
                     @endforeach
                 </div>

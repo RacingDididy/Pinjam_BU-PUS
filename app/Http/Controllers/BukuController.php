@@ -88,7 +88,7 @@ class BukuController extends Controller
                 'id' => $book->id,
                 'judul' => $book->judul,
                 'pengarang' => $book->pengarang,
-                'kategori' => $book->kategori->nama_kategori ?? 'Umum',
+                'kategori' => $book->kategori?->localized_name ?? __('Umum'),
                 'isbn' => $book->isbn,
                 'cover_url' => $book->cover_url,
                 'url' => route('buku.show', $book->id),
