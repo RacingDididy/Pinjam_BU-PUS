@@ -48,6 +48,23 @@
                 return inBorrower || inBooks;
             });
         },
+        confirmModalOpen: false,
+        confirmMode: 'approve',
+        confirmTargetTrx: null,
+        rejectReason: 'Identitas NIS/NISN belum sesuai dengan data siswa aktif SMK Negeri 5 Surakarta.',
+        openConfirmModal(trx, mode = 'approve') {
+            this.confirmTargetTrx = trx;
+            this.confirmMode = mode;
+            if (mode === 'reject') {
+                this.rejectReason = 'Identitas NIS/NISN belum sesuai dengan data siswa aktif SMK Negeri 5 Surakarta.';
+            }
+            this.confirmModalOpen = true;
+        },
+        closeConfirmModal() {
+            if (this.busyTrx) return;
+            this.confirmModalOpen = false;
+            this.confirmTargetTrx = null;
+        },
         async approveTrx(kode) {
             if (this.busyTrx) return;
             this.busyTrx = kode;
@@ -64,6 +81,8 @@
                 if (res.ok && data.success) {
                     this.transactions = data.transactions;
                     this.metrics = data.reportMetrics;
+                    this.confirmModalOpen = false;
+                    this.confirmTargetTrx = null;
                     $dispatch('notify-toast', { message: data.message, type: 'success' });
                 } else {
                     $dispatch('notify-toast', { message: data.message || 'Gagal menyetujui peminjaman.', type: 'error' });
@@ -76,8 +95,6 @@
         },
         async rejectTrx(kode) {
             if (this.busyTrx) return;
-            const reason = prompt('Catatan penolakan untuk peminjam (opsional):', 'Stok fisik sedang dalam perawatan / identitas belum sesuai.');
-            if (reason === null) return;
             this.busyTrx = kode;
             try {
                 const res = await fetch(`/pustakawan/peminjaman/${encodeURIComponent(kode)}/reject`, {
@@ -87,13 +104,17 @@
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
                     },
-                    body: JSON.stringify({ catatan_pustakawan: reason })
+                    body: JSON.stringify({ catatan_pustakawan: this.rejectReason })
                 });
                 const data = await res.json();
                 if (res.ok && data.success) {
                     this.transactions = data.transactions;
                     this.metrics = data.reportMetrics;
+                    this.confirmModalOpen = false;
+                    this.confirmTargetTrx = null;
                     $dispatch('notify-toast', { message: data.message, type: 'success' });
+                } else {
+                    $dispatch('notify-toast', { message: data.message || 'Gagal menolak peminjaman.', type: 'error' });
                 }
             } catch (e) {
                 $dispatch('notify-toast', { message: 'Gangguan jaringan.', type: 'error' });
@@ -117,7 +138,11 @@
                 if (res.ok && data.success) {
                     this.transactions = data.transactions;
                     this.metrics = data.reportMetrics;
+                    this.confirmModalOpen = false;
+                    this.confirmTargetTrx = null;
                     $dispatch('notify-toast', { message: data.message, type: 'success' });
+                } else {
+                    $dispatch('notify-toast', { message: data.message || 'Gagal memproses pengembalian.', type: 'error' });
                 }
             } catch (e) {
                 $dispatch('notify-toast', { message: 'Gangguan jaringan.', type: 'error' });
@@ -356,7 +381,7 @@
                                 <div class="flex items-center gap-2 w-full sm:w-auto">
                                     <button 
                                         type="button"
-                                        @click="approveTrx(trx.kode_transaksi)"
+                                        @click="openConfirmModal(trx, 'approve')"
                                         :disabled="busyTrx === trx.kode_transaksi"
                                         class="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs inline-flex items-center justify-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
                                     >
@@ -365,7 +390,7 @@
                                     </button>
                                     <button 
                                         type="button"
-                                        @click="rejectTrx(trx.kode_transaksi)"
+                                        @click="openConfirmModal(trx, 'reject')"
                                         :disabled="busyTrx === trx.kode_transaksi"
                                         class="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs inline-flex items-center justify-center gap-1 transition-colors disabled:opacity-50"
                                     >
@@ -378,7 +403,7 @@
                             <template x-if="trx.status === 'sedang_dipinjam' || trx.status === 'terlambat'">
                                 <button 
                                     type="button"
-                                    @click="completeTrx(trx.kode_transaksi)"
+                                    @click="openConfirmModal(trx, 'complete')"
                                     :disabled="busyTrx === trx.kode_transaksi"
                                     class="w-full sm:w-auto px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs inline-flex items-center justify-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
                                 >
@@ -490,6 +515,220 @@
         </div>
 
     </section>
+
+    <!-- Card Popup Konfirmasi Persetujuan, Penolakan, & Pengembalian Buku -->
+    <div
+        x-show="confirmModalOpen && confirmTargetTrx"
+        x-cloak
+        x-transition.opacity
+        @keydown.escape.window="closeConfirmModal()"
+        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs"
+    >
+        <div
+            @click.outside="closeConfirmModal()"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+            x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+            class="w-full max-w-lg rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-hidden"
+        >
+            <template x-if="confirmTargetTrx">
+                <div>
+                    <!-- Header Modal -->
+                    <div
+                        class="px-5 py-4 text-white flex items-start justify-between gap-3"
+                        :class="confirmMode === 'approve' ? 'bg-gradient-to-r from-emerald-600 to-teal-600' : (confirmMode === 'reject' ? 'bg-gradient-to-r from-rose-600 to-red-600' : 'bg-gradient-to-r from-blue-600 to-indigo-600')"
+                    >
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-xl shrink-0">
+                                <i class="ph-bold" :class="confirmMode === 'approve' ? 'ph-shield-check' : (confirmMode === 'reject' ? 'ph-x-circle' : 'ph-arrow-u-up-left')"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <h3
+                                        class="text-sm sm:text-base font-extrabold tracking-tight"
+                                        x-text="confirmMode === 'approve' ? 'Konfirmasi Persetujuan Peminjaman' : (confirmMode === 'reject' ? 'Konfirmasi Penolakan Peminjaman' : 'Konfirmasi Pengembalian Buku')"
+                                    ></h3>
+                                    <span class="px-2 py-0.5 rounded-md bg-white/20 font-mono text-[11px] font-bold" x-text="'#' + confirmTargetTrx.kode_transaksi"></span>
+                                </div>
+                                <p
+                                    class="text-[11px] text-white/90 mt-0.5"
+                                    x-text="confirmMode === 'approve' ? 'Periksa kesesuaian NIS, NISN, dan Kelas siswa sebelum menyetujui.' : (confirmMode === 'reject' ? 'Stok buku akan dikembalikan otomatis ke katalog perpustakaan.' : 'Pastikan buku fisik telah diterima dengan lengkap di meja sirkulasi.')"
+                                ></p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            @click="closeConfirmModal()"
+                            class="w-8 h-8 rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition-colors shrink-0"
+                        >
+                            <i class="ph-bold ph-x text-sm"></i>
+                        </button>
+                    </div>
+
+                    <!-- Body Modal -->
+                    <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+                        <!-- Banner Peringatan Verifikasi Siswa SMKN 5 -->
+                        <div x-show="confirmMode === 'approve'" class="p-3 rounded-2xl bg-amber-50 border border-amber-200/90 flex items-start gap-2.5">
+                            <i class="ph-fill ph-warning-circle text-amber-600 text-base shrink-0 mt-0.5"></i>
+                            <p class="text-[11px] text-amber-900 leading-relaxed">
+                                <strong>Cek Keaslian Siswa:</strong> Pastikan <strong>NIS</strong> dan <strong>NISN</strong> di bawah benar merupakan siswa aktif <strong>SMK Negeri 5 Surakarta</strong> untuk mencegah peminjaman oleh pihak luar.
+                            </p>
+                        </div>
+
+                        <!-- Kartu Data Identitas & NIS Peminjam -->
+                        <div class="rounded-2xl bg-slate-50 border border-slate-200/90 p-3.5 space-y-3">
+                            <div class="flex items-center justify-between border-b border-slate-200/70 pb-2">
+                                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                                    IDENTITAS SISWA PEMINJAM
+                                </span>
+                                <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold" x-text="confirmTargetTrx.borrower.nama_sekolah"></span>
+                            </div>
+
+                            <div class="flex items-center gap-3">
+                                <span
+                                    class="w-10 h-10 rounded-full flex items-center justify-center font-extrabold text-sm shrink-0"
+                                    :style="`background-color: ${confirmTargetTrx.borrower.palette.bg}; color: ${confirmTargetTrx.borrower.palette.text};`"
+                                    x-text="confirmTargetTrx.borrower.initial"
+                                ></span>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-extrabold text-slate-900 truncate" x-text="confirmTargetTrx.borrower.name"></p>
+                                    <p class="text-xs text-slate-500 truncate" x-text="confirmTargetTrx.borrower.email"></p>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                                <div class="p-2.5 rounded-xl bg-white border-2 border-emerald-200">
+                                    <span class="text-[10px] font-bold text-slate-400 block">NIS Siswa</span>
+                                    <span class="font-mono font-black text-sm text-emerald-700" x-text="confirmTargetTrx.borrower.nis"></span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-white border border-slate-200">
+                                    <span class="text-[10px] font-bold text-slate-400 block">NISN (10 Digit)</span>
+                                    <span class="font-mono font-extrabold text-xs text-blue-600" x-text="confirmTargetTrx.borrower.nisn"></span>
+                                </div>
+                                <div class="col-span-2 sm:col-span-1 p-2.5 rounded-xl bg-white border border-slate-200">
+                                    <span class="text-[10px] font-bold text-slate-400 block">Kelas &amp; Jurusan</span>
+                                    <span class="font-extrabold text-xs text-slate-800" x-text="confirmTargetTrx.borrower.nama_kelas"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Info Denda jika Terlambat saat Complete -->
+                        <template x-if="confirmMode === 'complete' && confirmTargetTrx.overdue_days > 0">
+                            <div class="p-3 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-2 text-rose-800">
+                                    <i class="ph-fill ph-warning-octagon text-lg text-rose-600"></i>
+                                    <span class="text-xs font-bold">Terlambat <strong x-text="confirmTargetTrx.overdue_days"></strong> Hari</span>
+                                </div>
+                                <span class="px-2.5 py-1 rounded-lg bg-rose-600 text-white font-extrabold text-xs" x-text="'Denda: ' + confirmTargetTrx.denda_formatted"></span>
+                            </div>
+                        </template>
+
+                        <!-- Ringkasan Buku yang Dipinjam -->
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="font-extrabold text-slate-700">
+                                    Daftar Buku (<span x-text="confirmTargetTrx.total_books"></span> Eksemplar)
+                                </span>
+                                <span class="text-[11px] text-slate-500">
+                                    Tenggat: <strong class="text-slate-800" x-text="confirmTargetTrx.tenggat_kembali"></strong>
+                                </span>
+                            </div>
+
+                            <div class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                <template x-for="b in confirmTargetTrx.books" :key="b.loan_id">
+                                    <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
+                                        <img :src="b.cover_url" :alt="b.judul" class="w-9 h-12 object-cover rounded-lg bg-slate-200 shrink-0">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-xs font-extrabold text-slate-900 truncate" x-text="b.judul"></p>
+                                            <p class="text-[11px] text-slate-500 truncate" x-text="b.pengarang"></p>
+                                        </div>
+                                        <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-extrabold text-[11px] shrink-0">
+                                            <span x-text="b.jumlah"></span> Buku
+                                        </span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Form Alasan Penolakan (Muncul jika mode === 'reject') -->
+                        <div x-show="confirmMode === 'reject'" x-transition class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 space-y-2">
+                            <label class="block text-xs font-extrabold text-rose-800">
+                                Catatan Penolakan untuk Peminjam:
+                            </label>
+                            <textarea
+                                x-model="rejectReason"
+                                rows="2"
+                                class="w-full rounded-xl bg-white border border-rose-200 px-3 py-2 text-xs text-slate-800 outline-none focus:border-rose-500"
+                                placeholder="Tuliskan alasan penolakan..."
+                            ></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Footer Tombol Konfirmasi -->
+                    <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+                        <button
+                            type="button"
+                            @click="closeConfirmModal()"
+                            :disabled="busyTrx === confirmTargetTrx.kode_transaksi"
+                            class="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs transition-colors"
+                        >
+                            Batal
+                        </button>
+
+                        <div class="flex items-center gap-2">
+                            <template x-if="confirmMode === 'approve'">
+                                <button
+                                    type="button"
+                                    @click="confirmMode = 'reject'"
+                                    :disabled="busyTrx === confirmTargetTrx.kode_transaksi"
+                                    class="px-3.5 py-2.5 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs inline-flex items-center gap-1 transition-colors"
+                                >
+                                    <i class="ph-bold ph-x-circle"></i>
+                                    <span>Tolak</span>
+                                </button>
+                            </template>
+
+                            <template x-if="confirmMode === 'approve'">
+                                <button
+                                    type="button"
+                                    @click="approveTrx(confirmTargetTrx.kode_transaksi)"
+                                    :disabled="busyTrx === confirmTargetTrx.kode_transaksi"
+                                    class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
+                                >
+                                    <i class="ph-bold text-sm" :class="busyTrx === confirmTargetTrx.kode_transaksi ? 'ph-spinner animate-spin' : 'ph-check-circle'"></i>
+                                    <span x-text="busyTrx === confirmTargetTrx.kode_transaksi ? 'Menyetujui...' : 'Ya, NIS Sesuai & Setujui'"></span>
+                                </button>
+                            </template>
+
+                            <template x-if="confirmMode === 'reject'">
+                                <button
+                                    type="button"
+                                    @click="rejectTrx(confirmTargetTrx.kode_transaksi)"
+                                    :disabled="busyTrx === confirmTargetTrx.kode_transaksi"
+                                    class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
+                                >
+                                    <i class="ph-bold text-sm" :class="busyTrx === confirmTargetTrx.kode_transaksi ? 'ph-spinner animate-spin' : 'ph-x-circle'"></i>
+                                    <span x-text="busyTrx === confirmTargetTrx.kode_transaksi ? 'Menolak...' : 'Ya, Tolak Pengajuan'"></span>
+                                </button>
+                            </template>
+
+                            <template x-if="confirmMode === 'complete'">
+                                <button
+                                    type="button"
+                                    @click="completeTrx(confirmTargetTrx.kode_transaksi)"
+                                    :disabled="busyTrx === confirmTargetTrx.kode_transaksi"
+                                    class="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs inline-flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
+                                >
+                                    <i class="ph-bold text-sm" :class="busyTrx === confirmTargetTrx.kode_transaksi ? 'ph-spinner animate-spin' : 'ph-check-circle'"></i>
+                                    <span x-text="busyTrx === confirmTargetTrx.kode_transaksi ? 'Memproses...' : 'Ya, Buku Sudah Dikembalikan'"></span>
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
 
 </div>
 @endsection
